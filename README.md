@@ -23,14 +23,32 @@ The pipeline is based on a standard tracking + ReID framework:
 
 ## 📦 Project Structure
 
-reid/
-├── data/   # Dataset loading, preprocessing, transforms
-├── models/ # Backbone + embedding networks
-├── losses/ # Metric learning losses 
-├── engine/ # Training, evaluation, inference loops
-├── clustering/ # Feature clustering 
-├── matching/ # Cross-camera identity matching logic
-├── metrics/ # Evaluation metrics
-├── utils/   # Logging, checkpoints, visualization
-├── consts.py # Global constants
+The project is organized into modular components for clarity and scalability:
+
+```text
+project-root/
+│
+├── reid/                         # Core ReID library (all model logic)
+│   ├── data/                     # Dataset loaders, transforms
+│   ├── models/                   # Backbones, embedding networks
+│   ├── losses/                   # Metric learning losses
+│   ├── engine/                   # Train / eval / inference loops
+│   ├── clustering/               # Feature clustering 
+│   ├── matching/                 # Cross-camera identity matching
+│   ├── metrics/                  # HOTA, mAP, CMC
+│   ├── utils/                   # Logging, checkpointing, visualization
+│   └── consts.py                # Global constants
+│
+├── configs/                      # YAML/JSON experiment configs
+├── scripts/                      # Entry point scripts
+├── data/                         # Raw + processed datasets
+├── outputs/                      # Generated results
+├── tests/                        # Unit tests
+├── notebooks/                    # Experiments / visualization
+│
+├── requirements.txt
+├── pyproject.toml
+├── README.md
+└── .gitignore
+```
 
