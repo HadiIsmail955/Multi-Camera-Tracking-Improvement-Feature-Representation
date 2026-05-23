@@ -1,2 +1,13 @@
-DataSet
+__pycache__/
+*.pyc
+
+venv/
 env
+
+data/
+DataSet
+outputs/
+
+.ipynb_checkpoints/
+
+.DS_Store
