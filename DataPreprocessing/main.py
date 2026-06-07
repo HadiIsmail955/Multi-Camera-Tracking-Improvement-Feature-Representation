@@ -71,10 +71,29 @@ def process_scene(split, scene_name, scene_input):
         extract_crops(
             input_path=scene_input,
             output_path=temp_output,
-            frame_step=5,
+
+            frame_step=30,
+            bbox_format="xyxy",
+
+            min_width=30,
+            min_height=30,
+
             small_object_padding=True,
-            remove_overlap=True,
+            small_object_threshold=50,
+            small_object_padding_ratio=0.15,
+
+            remove_overlap=False,
             overlap_threshold=0.3,
+
+            generate_occlusion_crops=True,
+            occlusion_copies=2,
+            occlusion_min_width=50,
+            occlusion_min_height=50,
+            occlusion_min_area=2500,
+            occlusion_min_ratio=0.10,
+            occlusion_max_ratio=0.30,
+            occlusion_mode="background_patch",
+            occlusion_seed=42,
         )
 
         if os.path.exists(scene_output):

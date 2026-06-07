@@ -6,7 +6,8 @@ env
 
 data/
 DataSet
-outputs/
+outputs_reid/
+logs/
 
 .ipynb_checkpoints/
 

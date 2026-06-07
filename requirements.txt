@@ -1,2 +1,9 @@
 opencv-python
 tqdm
+torch
+scikit-learn 
+matplotlib 
+pandas 
+hdbscan
+torchvision
+PyYAML
