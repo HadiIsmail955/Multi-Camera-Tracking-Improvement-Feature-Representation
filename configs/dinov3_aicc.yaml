@@ -1,0 +1,34 @@
+model:
+  backbone: dinov3
+  pretrained: true
+  use_lora: false   # set to false for full fine-tuning
+  lora_rank: 16
+  osnet_weights: weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+
+data:
+  train: AICITY2025/aicity_reid/train_records.csv
+  query: AICITY2025/aicity_reid/query_records.csv
+  gallery: AICITY2025/aicity_reid/gallery_records.csv
+  num_workers: 4
+
+sampler:
+  P: 16
+  K: 4
+
+optim:
+  epochs: 1000
+  warmup: 10
+  lr: 0.0005
+  ce_weight: 1.0
+  triplet_weight: 1.0
+  margin: 0.3
+  label_smoothing: 0.1
+  max_grad_norm: 1.0
+
+eval:
+  interval: 50
+  batch_size: 64
+
+output:
+  checkpoint_dir: checkpoints_max
+  log_path: training_log.csv
