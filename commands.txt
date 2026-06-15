@@ -1,0 +1,10 @@
+To open folder in cluster : /pfs/work9/workspace/scratch/st_st201745-reid_project
+Path : cd Multi-Camera-Tracking-Improvement-Feature-Representation
+List cluster nodes: 
+Requesting gpu nodes:
+    salloc --partition=dev_gpu_a100_il --gres=gpu:1 --time=00:30:00 --cpus-per-task=4 --mem=32gb
+    salloc --partition=dev_gpu_h100 --gres=gpu:1 --time=00:30:00 --cpus-per-task=4 --mem=32gb
+    alloc --partition=gpu_a100_short --gres=gpu:1 --time=00:30:00 --cpus-per-task=4 --mem=32gb
+Activating uv : source .venv/bin/activate
+Training : python reid/train.py --config=/pfs/work9/workspace/scratch/st_st201745-reid_project/Multi-Camera-Tracking-Improvement-Feature-Representation/configs/dinov2_market.yaml
+Inference : python reid/inference.py --config=/pfs/work9/workspace/scratch/st_st201745-reid_project/Multi-Camera-Tracking-Improvement-Feature-Representation/configs/dinov2_market_infer.yaml

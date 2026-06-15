@@ -3,7 +3,7 @@ model:
   pretrained: true
   use_lora: false   # set to false for full fine-tuning
   lora_rank: 16
-  osnet_weights: weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+  osnet_weights: /pfs/work9/workspace/scratch/st_st201745-reid_project/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
 
 data:
   train: AICITY2025/aicity_reid/train_records.csv

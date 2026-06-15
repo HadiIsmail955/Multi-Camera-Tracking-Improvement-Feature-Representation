@@ -1,3 +1,7 @@
+import random
+
+import numpy as np
+import torch
 import torch.nn as nn
 
 
@@ -21,3 +25,20 @@ def param_summary(model: nn.Module, name: str) -> dict:
         "frozen": frozen,
         "trainable_pct": round(pct, 4),
     }
+
+def enable_determinism(seed: int = 42, use_deterministic: bool = False) -> None:
+    """Enable determinism across Python, Pytorch and Numpy.
+    Args:
+        seed (int): Sets the seed for determinism. Defaults to 42.
+        use_deterministic (bool): Use deterministic algorithms only.
+        A `RuntimeError` will be thrown when non-deterministic algorithms are
+        applied. Defaults to True.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(use_deterministic)

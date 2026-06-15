@@ -1,13 +1,14 @@
 model:
-  backbone: dinov2
-  feature_mode: cls_patchavg
+  backbone: osnet
+  feature_mode: cls
   lora_rank: 16
-  use_lora: false   # set to false for full fine-tuning
-  osnet_weights: null
+  use_lora: false   # set to false for running fine-tuned model
+  osnet_weights: /pfs/work9/workspace/scratch/st_st201745-reid_project/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+
 
 checkpoint:
-  path: checkpoints_arcface/best_model.pth
-  use_pretrained: false
+  # path: checkpoints/best_model.pth
+  use_pretrained: true
 
 data:
   query: data_csv/query_records.csv
@@ -18,7 +19,7 @@ eval:
   batch_size: 64
 
 rerank:
-  enabled: true
+  enabled: false
   k1: 20
   k2: 6
   lambda: 0.3
