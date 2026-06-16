@@ -2,12 +2,13 @@ model:
   backbone: dinov2
   pretrained: true
   lora_rank: 16
+  use_lora: false   # set to false for full fine-tuning
   osnet_weights: /pfs/work9/workspace/scratch/st_st201745-reid_project/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
 
 data:
-  train: AICITY2025/aicity_reid/train_records.csv
-  query: AICITY2025/aicity_reid/query_records.csv
-  gallery: AICITY2025/aicity_reid/gallery_records.csv
+  train: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_train_small.csv
+  query: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_query_small.csv
+  gallery: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_gallery_small.csv
   num_workers: 4
 
 sampler:
@@ -15,13 +16,15 @@ sampler:
   K: 4
 
 optim:
-  epochs: 1000
+  epochs: 300
   warmup: 10
-  lr: 0.0005
+  lr: 0.001
   ce_weight: 1.0
+  label_smoothing: 0.1
   triplet_weight: 1.0
   margin: 0.3
-  label_smoothing: 0.1
+  arcface_weight: 1.0
+  supcon_weight: 0.0
   max_grad_norm: 1.0
 
 eval:
@@ -29,5 +32,5 @@ eval:
   batch_size: 64
 
 output:
-  checkpoint_dir: checkpoints_max
+  checkpoint_dir: checkpoints
   log_path: training_log.csv

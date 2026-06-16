@@ -9,7 +9,7 @@ model:
 data:
   train: data_csv/train_records.csv
   query: data_csv/query_records.csv
-  gallery: data_csv/gallery_records.csv
+  gallery: data_csv/gallery_records_nojunk.csv
   num_workers: 4
 
 sampler:

@@ -1,5 +1,3 @@
-# src/engine/validate.py
-
 from reid.engine.inference import extract_embeddings
 from reid.evaluation import evaluate_reid
 
@@ -14,14 +12,14 @@ def validate(
         model=model,
         loader=query_loader,
         device=device,
-        show_progress=False,
+        show_progress=True,
     )
 
     g_embs, g_pids, g_camids = extract_embeddings(
         model=model,
         loader=gallery_loader,
         device=device,
-        show_progress=False,
+        show_progress=True,
     )
 
     return evaluate_reid(

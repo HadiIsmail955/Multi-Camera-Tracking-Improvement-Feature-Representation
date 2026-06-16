@@ -1,5 +1,3 @@
-# src/evaluation/distances.py
-
 import torch
 
 

@@ -6,7 +6,7 @@ import torch
 from reid.config import load_yaml_config
 from reid.data.records import load_records
 from reid.data.loaders import build_eval_loader
-from reid.engine import extract_embeddings
+from reid.engine import extract_embeddings, pool_tracklet_embeddings, read_tracklet_ids
 from reid.engine.checkpoint import load_checkpoint
 from reid.evaluation import (
     cosine_distance_matrix,
@@ -202,6 +202,35 @@ def main(config: dict):
     )
 
     print(f"    Embedding dim : {q_embs.shape[1]}")
+
+    # Tracklet pooling
+    tracklet_pool = data_cfg.get("tracklet_pool", None)  # "mean" | "max" | None
+    if tracklet_pool:
+        q_tracklet_ids = read_tracklet_ids(data_cfg["query"])
+        g_tracklet_ids = read_tracklet_ids(data_cfg["gallery"])
+
+        if not q_tracklet_ids[0]:
+            print("  [WARNING] query CSV has no tracklet_id column; skipping pooling.")
+        else:
+            q_embs, q_pids, q_camids, q_tids = pool_tracklet_embeddings(
+                q_embs,
+                q_pids,
+                q_camids,
+                q_tracklet_ids,
+                pool=tracklet_pool,
+            )
+            g_embs, g_pids, g_camids, g_tids = pool_tracklet_embeddings(
+                g_embs,
+                g_pids,
+                g_camids,
+                g_tracklet_ids,
+                pool=tracklet_pool,
+            )
+            print(
+                f"  Tracklet pooling ({tracklet_pool}): "
+                f"{len(q_tids)} query tracklets, "
+                f"{len(g_tids)} gallery tracklets"
+            )
 
     print("\n  Computing distance matrix...")
 

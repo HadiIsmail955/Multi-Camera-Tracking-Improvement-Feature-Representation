@@ -248,6 +248,16 @@ def train_model(
         mAP = 0.0
         is_best = False
 
+        # Save checkpoint just in case.
+        save_checkpoint(
+            path=last_checkpoint_path,
+            model=model,
+            epoch=epochs,
+            backbone=backbone,
+            rank1=last_rank1,
+            mAP=last_mAP,
+        )
+
         if should_validate:
             rank1, mAP = validate(
                 model=model,
@@ -313,6 +323,7 @@ def train_model(
                 f"[{elapsed:.1f}s]"
             )
 
+    # Overwrite last checkpoint with score info.
     save_checkpoint(
         path=last_checkpoint_path,
         model=model,

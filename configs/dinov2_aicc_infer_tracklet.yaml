@@ -1,7 +1,7 @@
 model:
   backbone: dinov2
   lora_rank: 16
-  use_lora: false   # set to false for full fine-tuning
+  use_lora: false
   osnet_weights: null
 
 checkpoint:
@@ -12,9 +12,12 @@ data:
   query: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_query_small.csv
   gallery: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_gallery_small.csv
   num_workers: 4
+  # Pool per-image embeddings into one descriptor per tracklet.
+  # Options: "mean" | "max" | null (image-level, no pooling)
+  tracklet_pool: dbscan
 
 eval:
-  batch_size: 256
+  batch_size: 64
 
 rerank:
   enabled: false
