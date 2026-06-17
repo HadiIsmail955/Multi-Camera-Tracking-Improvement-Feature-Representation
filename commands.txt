@@ -1,3 +1,5 @@
+###### bw-unicluster ######
+
 To open folder in cluster : /pfs/work9/workspace/scratch/st_st201745-reid_project
 Path : cd Multi-Camera-Tracking-Improvement-Feature-Representation
 List cluster nodes: 
@@ -6,5 +8,12 @@ Requesting gpu nodes:
     salloc --partition=dev_gpu_h100 --gres=gpu:1 --time=00:30:00 --cpus-per-task=4 --mem=32gb
     alloc --partition=gpu_a100_short --gres=gpu:1 --time=00:30:00 --cpus-per-task=4 --mem=32gb
 Activating uv : source .venv/bin/activate
-Training : python reid/train.py --config=/pfs/work9/workspace/scratch/st_st201745-reid_project/Multi-Camera-Tracking-Improvement-Feature-Representation/configs/dinov2_market.yaml
-Inference : python reid/inference.py --config=/pfs/work9/workspace/scratch/st_st201745-reid_project/Multi-Camera-Tracking-Improvement-Feature-Representation/configs/dinov2_market_infer.yaml
+Training : python reid/train.py --config=/mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/configs/dinov2_market.yaml
+Inference : python reid/inference.py --config=/mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/configs/dinov2_market_infer.yaml
+
+###### aisa-mgmt01 ######
+
+To run batch script: sbatch run_reid.sh
+Chceck status of job: squeue -u st201745
+Check progress: cat train_33195.out
+Check progress live: tail -f train_33195.out
