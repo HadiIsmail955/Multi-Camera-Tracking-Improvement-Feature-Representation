@@ -289,11 +289,10 @@ def pool_tracklet_embeddings(
 
             sign = torch.sign(group.mean(dim=0))
 
-            x = group.abs().clamp(min=1e-6)
+            x_pow = torch.sign(group) * torch.abs(group).pow(gem_p)
+            gem_emb = torch.sign(x_pow.mean(dim=0)) * torch.abs(x_pow.mean(dim=0)).pow(1.0 / gem_p)
 
-            gem_emb = x.pow(gem_p).mean(dim=0).pow(1.0 / gem_p)
-
-            pooled_embs.append(sign * gem_emb)
+            pooled_embs.append(gem_emb)
 
             continue
 
