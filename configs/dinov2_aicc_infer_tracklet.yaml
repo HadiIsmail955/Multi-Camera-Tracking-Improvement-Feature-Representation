@@ -3,17 +3,19 @@ model:
   lora_rank: 16
   use_lora: false
   osnet_weights: null
+  feature_mode: cls
 
 checkpoint:
-  path: checkpoints/best_model.pth
-  use_pretrained: false
+  path: /mnt/nfs/home/st201745/checkpoints/best_model.pth
+  use_pretrained: true
 
 data:
-  query: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_query_small.csv
-  gallery: /pfs/work9/workspace/scratch/st_st201745-reid_project/manifests/image_gallery_small.csv
+  query: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_query.csv
+  gallery: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_gallery.csv
   num_workers: 4
   # Pool per-image embeddings into one descriptor per tracklet.
   # Options: "mean" | "max" | null (image-level, no pooling)
+  # "mean" | "max" |"dbscan"| "weighted" |"medoid" |"gem"
   tracklet_pool: dbscan
 
 eval:
@@ -26,5 +28,5 @@ rerank:
   lambda: 0.3
 
 output:
-  distance_matrix: distance_matrix.pt
-  matching_results: matching_results.csv
+  distance_matrix: /mnt/nfs/home/st201745/checkpoints/distance_matrix.pt
+  matching_results: /mnt/nfs/home/st201745/checkpoints/matching_results.csv

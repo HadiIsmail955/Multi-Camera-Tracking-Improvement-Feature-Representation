@@ -4,12 +4,12 @@ model:
   pretrained: true
   lora_rank: 16
   use_lora: false
-  osnet_weights: /pfs/work9/workspace/scratch/st_st201745-reid_project/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+  osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
 
 data:
   train: data_csv/train_records.csv
   query: data_csv/query_records.csv
-  gallery: data_csv/gallery_records_nojunk.csv
+  gallery: data_csv/gallery_records.csv
   num_workers: 4
 
 sampler:

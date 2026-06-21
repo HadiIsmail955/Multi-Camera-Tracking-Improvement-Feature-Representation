@@ -1,8 +1,8 @@
 model:
-  backbone: dinov2
-  feature_mode: cls
+  backbone: osnet
+  feature_mode: cls_patchavg
   pretrained: true
-  lora_rank: 16
+  lora_rank: 32
   use_lora: false   # set to false for full fine-tuning
   osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
 
@@ -25,11 +25,11 @@ optim:
   triplet_weight: 1.0
   margin: 0.3
   arcface_weight: 1.0
-  supcon_weight: 0.0
+  supcon_weight: 1.0
   max_grad_norm: 1.0
 
 eval:
-  interval: 50
+  interval: 100
   batch_size: 64
 
 output:

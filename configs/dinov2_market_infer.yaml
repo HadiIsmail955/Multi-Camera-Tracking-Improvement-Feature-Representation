@@ -10,8 +10,8 @@ checkpoint:
   use_pretrained: false
 
 data:
-  query: data_csv/query_records.csv
-  gallery: data_csv/gallery_records_nojunk.csv
+  query: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/query_records.csv
+  gallery: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/gallery_records.csv
   num_workers: 4
 
 eval:

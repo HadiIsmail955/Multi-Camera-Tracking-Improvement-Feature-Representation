@@ -1,9 +1,9 @@
 model:
-  backbone: dinov2
+  backbone: osnet
   lora_rank: 16
-  use_lora: false   # set to false for full fine-tuning
-  osnet_weights: null
-  feature_mode: cls
+  use_lora: false
+  osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+  feature_mode: cls_patchavg
 
 checkpoint:
   path: /mnt/nfs/home/st201745/checkpoints/best_model.pth
@@ -13,9 +13,13 @@ data:
   query: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_query.csv
   gallery: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_gallery.csv
   num_workers: 4
+  # Pool per-image embeddings into one descriptor per tracklet.
+  # Options: "mean" | "max" | null (image-level, no pooling)     valid_pools = (
+  # "mean" | "max" |"dbscan"| "weighted" |"medoid" |"consensus" |"gem"
+  tracklet_pool: dbscan
 
 eval:
-  batch_size: 256
+  batch_size: 64
 
 rerank:
   enabled: false
