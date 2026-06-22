@@ -2,7 +2,7 @@
 
 This repository provides a YAML-driven ReID pipeline for:
 
-- Training with `osnet`, `dinov2`, or `dinov3` (requires manual download)
+- Training with `osnet` or `dinov2`
 - Random Erasing Augmentation
 - BNNeck
 - LoRA or full fine-tuning (for DINO backbones)
@@ -16,6 +16,35 @@ This repository provides a YAML-driven ReID pipeline for:
 - `reid/train.py`: training entrypoint
 - `reid/inference.py`: inference / matching entrypoint
 - `configs/*.yaml`: training and inference configs
+
+## MTMC Tracking 2025 Dataset Preprocessing
+
+The preprocessing pipeline converts raw MTMC annotations into tracklets and cropped object images for training and evaluation.
+
+### Processing Steps
+- Downsample annotations from **30 FPS to 1 FPS**.
+- Split tracklets after long visibility gaps (when an object is absent for more than 1 second) and remove very short fragments (<2 frames). 
+- Assign globally consistent object identities across all dataset splits (scene_objectID).
+- Sample up to **30 evenly spaced frames** per tracklet.
+- Construct **Query/Gallery** evaluation sets using identities observed across multiple cameras.
+- Extract object crops in parallel with support for resumable processing.
+
+### Dataset Statistics
+
+| Split | Images | Tracklets |
+|---------|---------:|---------:|
+| Train | 1,214,776 | 79,622 |
+| Query | 3,925 | 131 |
+| Gallery | 106,374 | 7,503 |
+
+**Total unique identities:** 994
+
+### Evaluation Protocol
+
+* For validation, only identities visible in at least two cameras are considered. 
+* The longest tracklet of an identity is selected as the **Query**, while tracklets from other cameras form the **Gallery**.
+* The query tracklet is excluded from the gallery.
+
 
 ## Ablation Study on Market-1501 Dataset
 
