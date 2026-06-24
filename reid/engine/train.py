@@ -44,12 +44,14 @@ def train_one_epoch(
     triplet_loss,
     supcon_loss,
     arcface_loss,
+    occlusion_loss,
     device,
     amp_enabled: bool = False,
     ce_weight: float = 1.0,
     triplet_weight: float = 1.0,
     supcon_weight: float = 0.2,
     arcface_weight: float = 0.0,
+    occlusion_weight: float = 0.0,
     max_grad_norm: float = 1.0,
     epoch: int | None = None,
     print_every: int = 1,
@@ -61,6 +63,7 @@ def train_one_epoch(
     tri_running = 0.0
     supcon_running = 0.0
     arcface_running = 0.0
+    occlusion_running = 0.0
     n_batches = 0
 
     for imgs, labels, _ in train_loader:
@@ -105,11 +108,18 @@ def train_one_epoch(
             else:
                 loss_arcface = embs.new_tensor(0.0)
 
+            loss_occlusion = (
+                occlusion_loss(embeddings=embs)
+                if (occlusion_loss is not None and occlusion_weight > 0.0)
+                else embs.new_tensor(0.0)
+            )
+
             loss = (
                 ce_weight * loss_ce
                 + triplet_weight * loss_tri
                 + supcon_weight * loss_supcon
                 + arcface_weight * loss_arcface
+                + occlusion_weight * loss_occlusion
             )
 
         optimizer.zero_grad(set_to_none=True)
@@ -142,6 +152,7 @@ def train_one_epoch(
         tri_running += loss_tri.item()
         supcon_running += loss_supcon.item()
         arcface_running += loss_arcface.item()
+        occlusion_running += loss_occlusion.item()
         n_batches += 1
 
         if print_every and n_batches % print_every == 0:
@@ -152,7 +163,8 @@ def train_one_epoch(
                 f"ce={loss_ce.item():.4f}  "
                 f"tri={loss_tri.item():.4f}  "
                 f"supcon={loss_supcon.item():.4f}  "
-                f"arc={loss_arcface.item():.4f}",
+                f"arc={loss_arcface.item():.4f}  "
+                f"occ={loss_occlusion.item():.4f}",
                 end="",
             )
 
@@ -167,6 +179,7 @@ def train_one_epoch(
         "loss_triplet": tri_running / n_batches,
         "loss_supcon": supcon_running / n_batches,
         "loss_arcface": arcface_running / n_batches,
+        "loss_occlusion": occlusion_running / n_batches,
         "num_batches": n_batches,
     }
 
@@ -182,6 +195,7 @@ def train_model(
     triplet_loss,
     supcon_loss,
     arcface_loss,
+    occlusion_loss,
     device,
     *,
     epochs: int,
@@ -190,6 +204,7 @@ def train_model(
     triplet_weight: float = 1.0,
     supcon_weight: float = 0.2,
     arcface_weight: float = 0.0,
+    occlusion_weight: float = 0.0,
     eval_interval: int = 50,
     checkpoint_dir: str = "checkpoints",
     log_path: str = "training_log.csv",
@@ -199,7 +214,11 @@ def train_model(
     print("Training started...")
 
     amp_enabled = amp and (device.type == "cuda")
-    scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
+    amp_module = getattr(torch, "amp", None)
+    if amp_module is not None and hasattr(amp_module, "GradScaler"):
+        scaler = amp_module.GradScaler("cuda", enabled=amp_enabled)
+    else:
+        scaler = torch.amp.GradScaler(enabled=amp_enabled)
 
     if amp and not amp_enabled:
         print("  [NOTE] mixed_precision requested but CUDA is unavailable; using FP32.")
@@ -226,12 +245,14 @@ def train_model(
             triplet_loss=triplet_loss,
             supcon_loss=supcon_loss,
             arcface_loss=arcface_loss,
+            occlusion_loss=occlusion_loss,
             device=device,
             amp_enabled=amp_enabled,
             ce_weight=ce_weight,
             triplet_weight=triplet_weight,
             supcon_weight=supcon_weight,
             arcface_weight=arcface_weight,
+            occlusion_weight=occlusion_weight,
             max_grad_norm=max_grad_norm,
             epoch=epoch,
         )
@@ -245,6 +266,8 @@ def train_model(
         should_validate = epoch % eval_interval == 0 or epoch == epochs
 
         rank1 = 0.0
+        rank5 = 0.0
+        rank10 = 0.0
         mAP = 0.0
         is_best = False
 
@@ -259,7 +282,7 @@ def train_model(
         )
 
         if should_validate:
-            rank1, mAP = validate(
+            rank1, rank5, rank10, mAP = validate(
                 model=model,
                 query_loader=query_loader,
                 gallery_loader=gallery_loader,
@@ -290,6 +313,7 @@ def train_model(
                 loss_triplet=train_stats["loss_triplet"],
                 loss_supcon=train_stats["loss_supcon"],
                 loss_arcface=train_stats["loss_arcface"],
+                loss_occlusion=train_stats["loss_occlusion"],
                 lr=lr_now,
                 rank1=rank1,
                 mAP=mAP,
@@ -305,8 +329,11 @@ def train_model(
                 f"tri={train_stats['loss_triplet']:.4f}  "
                 f"supcon={train_stats['loss_supcon']:.4f}  "
                 f"arc={train_stats['loss_arcface']:.4f}  "
+                f"occ={train_stats['loss_occlusion']:.4f}  "
                 f"lr={lr_now:.2e}  "
                 f"Rank-1={rank1:.4f}  "
+                f"Rank-5={rank5:.4f}  "
+                f"Rank-10={rank10:.4f}  "
                 f"mAP={mAP:.4f}  "
                 f"[{elapsed:.1f}s]"
                 f"{star}"
@@ -319,6 +346,7 @@ def train_model(
                 f"tri={train_stats['loss_triplet']:.4f}  "
                 f"supcon={train_stats['loss_supcon']:.4f}  "
                 f"arc={train_stats['loss_arcface']:.4f}  "
+                f"occ={train_stats['loss_occlusion']:.4f}  "
                 f"lr={lr_now:.2e}  "
                 f"[{elapsed:.1f}s]"
             )

@@ -7,14 +7,16 @@ def compute_rank1_map(
     q_camids: list[int],
     g_pids: list[int],
     g_camids: list[int],
-) -> tuple[float, float]:
+) -> tuple[float, float, float, float]:
     """
-    Compute Rank-1 and mAP for person ReID.
+    Compute Rank-1 / Rank-5 / Rank-10 and mAP for person ReID.
 
     ranked_indices must contain gallery indices sorted best-to-worst.
     Same-camera same-identity junk should already be removed from ranking.
     """
     rank1_hits = 0
+    rank5_hits = 0
+    rank10_hits = 0
     ap_list = []
 
     for i, ranked in enumerate(ranked_indices):
@@ -23,6 +25,12 @@ def compute_rank1_map(
 
         if ranked and g_pids[ranked[0]] == q_pid:
             rank1_hits += 1
+
+        if any(g_pids[idx] == q_pid for idx in ranked[:5]):
+            rank5_hits += 1
+
+        if any(g_pids[idx] == q_pid for idx in ranked[:10]):
+            rank10_hits += 1
 
         num_gt = sum(
             1
@@ -44,6 +52,8 @@ def compute_rank1_map(
         ap_list.append(precision_sum / num_gt)
 
     rank1 = rank1_hits / len(q_pids) if q_pids else 0.0
+    rank5 = rank5_hits / len(q_pids) if q_pids else 0.0
+    rank10 = rank10_hits / len(q_pids) if q_pids else 0.0
     mAP = sum(ap_list) / len(ap_list) if ap_list else 0.0
 
-    return rank1, mAP
+    return rank1, rank5, rank10, mAP

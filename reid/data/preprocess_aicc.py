@@ -62,11 +62,11 @@ logger = logging.getLogger(__name__)
 # Pipeline defaults
 # ─────────────────────────────────────────────────────────────────────────────
 
-_DEFAULT_NUM_SAMPLES: int = 30   # evenly-spaced frames sampled per tracklet
-_DEFAULT_MAX_GAP: int = 30       # video-frame gap that forces a tracklet split
-                                  # (= ann_stride: split on any missing annotation)
-_DEFAULT_MIN_LEN: int = 2        # minimum annotation frames to retain a tracklet
-_DEFAULT_ANN_STRIDE: int = 30    # keep only frames where frame_id % stride == 0
+_DEFAULT_NUM_SAMPLES: int = 30  # evenly-spaced frames sampled per tracklet
+_DEFAULT_MAX_GAP: int = 30  # video-frame gap that forces a tracklet split
+# (= ann_stride: split on any missing annotation)
+_DEFAULT_MIN_LEN: int = 2  # minimum annotation frames to retain a tracklet
+_DEFAULT_ANN_STRIDE: int = 30  # keep only frames where frame_id % stride == 0
 
 _IMAGE_HEADER: tuple[str, ...] = (
     "filepath",
@@ -199,9 +199,9 @@ def _parse_ground_truth(scene_dir: Path) -> _RawAnnotations:
 
     result: _RawAnnotations = defaultdict(lambda: defaultdict(list))
 
-    for frame_key, annotations in raw.items():
+    for frame_key, _annotations in raw.items():
         fid = int(frame_key)
-        for ann in annotations:
+        for ann in _annotations:
             obj_id: int = ann["object id"]
             obj_type: str = ann["object type"]
             for cam, box in ann.get("2d bounding box visible", {}).items():
@@ -270,9 +270,7 @@ def build_scene_tracklets(
                 tracklets.append(
                     Tracklet(
                         tracklet_id=(
-                            f"{scene}_{camera}"
-                            f"_obj{obj_id:06d}"
-                            f"_trk{trk_idx:03d}"
+                            f"{scene}_{camera}_obj{obj_id:06d}_trk{trk_idx:03d}"
                         ),
                         pid=-1,
                         camid=cam_id[camera],
@@ -306,14 +304,9 @@ def build_pid_map(all_tracklets: list[Tracklet]) -> dict[str, int]:
     Returns:
         Mapping from identity key to sequential integer PID.
     """
-    identities: set[tuple[str, int]] = {
-        (t.scene, t.object_id) for t in all_tracklets
-    }
+    identities: set[tuple[str, int]] = {(t.scene, t.object_id) for t in all_tracklets}
     sorted_ids = sorted(identities, key=lambda x: f"{x[0]}_{x[1]}")
-    return {
-        f"{scene}_{obj_id}": pid
-        for pid, (scene, obj_id) in enumerate(sorted_ids)
-    }
+    return {f"{scene}_{obj_id}": pid for pid, (scene, obj_id) in enumerate(sorted_ids)}
 
 
 def _assign_pids(tracklets: list[Tracklet], pid_map: dict[str, int]) -> None:
@@ -432,9 +425,7 @@ def _decode_worker(task: _WorkerTask) -> list[dict[str, Any]]:
     crops_root = Path(task.crops_root)
 
     # ── Build frame → list[(tracklet, bbox, out_path)] for missing files ──
-    frame_jobs: dict[
-        int, list[tuple[Tracklet, _Bbox, Path]]
-    ] = defaultdict(list)
+    frame_jobs: dict[int, list[tuple[Tracklet, _Bbox, Path]]] = defaultdict(list)
 
     for trk in task.tracklets:
         for fid in trk.sampled_frames:
@@ -461,9 +452,7 @@ def _decode_worker(task: _WorkerTask) -> list[dict[str, Any]]:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, float(fid))
                 ret, frame = cap.read()
                 if not ret:
-                    logger.warning(
-                        "Unreadable frame %d in %s", fid, task.video_path
-                    )
+                    logger.warning("Unreadable frame %d in %s", fid, task.video_path)
                     continue
 
                 h, w = frame.shape[:2]
@@ -734,9 +723,7 @@ def main() -> None:
             logger.warning("Split directory not found, skipping: %s", split_dir)
             continue
         scene_dirs = sorted(d for d in split_dir.iterdir() if d.is_dir())
-        for scene_dir in tqdm(
-            scene_dirs, desc=f"  Parse {split_name}", unit="scene"
-        ):
+        for scene_dir in tqdm(scene_dirs, desc=f"  Parse {split_name}", unit="scene"):
             container.extend(
                 build_scene_tracklets(
                     scene_dir,
@@ -760,9 +747,7 @@ def main() -> None:
 
     pid_map_path = manifests_dir / "pid_map.json"
     pid_map_path.write_text(json.dumps(pid_map, indent=2))
-    logger.info(
-        "  %d unique identities  →  %s", len(pid_map), pid_map_path.name
-    )
+    logger.info("  %d unique identities  →  %s", len(pid_map), pid_map_path.name)
 
     # ── Stage 3: Sample frames ────────────────────────────────────────────
     logger.info(
@@ -777,12 +762,8 @@ def main() -> None:
     gallery_tracklets: list[Tracklet] = []
 
     if process_val:
-        logger.info(
-            "══════════  Stage 4 — Select query / gallery  ══════════"
-        )
-        query_tracklets, gallery_tracklets = select_query_gallery(
-            val_tracklets
-        )
+        logger.info("══════════  Stage 4 — Select query / gallery  ══════════")
+        query_tracklets, gallery_tracklets = select_query_gallery(val_tracklets)
         logger.info(
             "  query: %d tracklets   gallery: %d tracklets",
             len(query_tracklets),
@@ -817,10 +798,7 @@ def main() -> None:
     if process_val:
         # Deduplicate tracklets (query ∩ gallery = ∅ by design, but be safe)
         unique_val_trks = list(
-            {
-                t.tracklet_id: t
-                for t in query_tracklets + gallery_tracklets
-            }.values()
+            {t.tracklet_id: t for t in query_tracklets + gallery_tracklets}.values()
         )
         val_records = run_decode(
             dataset_root / "val",
@@ -831,9 +809,7 @@ def main() -> None:
             desc="  Val decode",
         )
 
-        query_tids: frozenset[str] = frozenset(
-            t.tracklet_id for t in query_tracklets
-        )
+        query_tids: frozenset[str] = frozenset(t.tracklet_id for t in query_tracklets)
         gallery_tids: frozenset[str] = frozenset(
             t.tracklet_id for t in gallery_tracklets
         )

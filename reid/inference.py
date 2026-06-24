@@ -35,6 +35,22 @@ def _checkpoint_uses_lora(checkpoint: dict) -> bool:
     return any((".lora_A" in key) or (".lora_B" in key) for key in state_dict.keys())
 
 
+def _infer_dinov2_model_name_from_checkpoint(checkpoint: dict) -> str | None:
+    state_dict = checkpoint.get("state_dict", {})
+
+    for key in ("vit.norm.weight", "module.vit.norm.weight"):
+        weight = state_dict.get(key)
+        if isinstance(weight, torch.Tensor) and weight.ndim == 1:
+            if int(weight.shape[0]) == 1024:
+                return "dinov2_vitl14"
+            if int(weight.shape[0]) == 768:
+                return "dinov2_vitb14"
+            if int(weight.shape[0]) == 384:
+                return "dinov2_vits14"
+
+    return None
+
+
 def load_model_from_config(config: dict, device):
     model_cfg = config["model"]
     ckpt_cfg = config["checkpoint"]
@@ -51,6 +67,7 @@ def load_model_from_config(config: dict, device):
             lora_rank=model_cfg["lora_rank"],
             use_lora=model_cfg.get("use_lora", True),
             osnet_weight_path=model_cfg.get("osnet_weights"),
+            dino_model_name=model_cfg.get("model_name", "dinov2_vitb14"),
             dino_feature_mode=model_cfg.get("feature_mode", "cls"),
         ).to(device)
 
@@ -82,6 +99,21 @@ def load_model_from_config(config: dict, device):
             f"Using checkpoint backbone."
         )
 
+    resolved_dino_model_name = model_cfg.get("model_name", "dinov2_vitb14")
+    if checkpoint_backbone == "dinov2":
+        ckpt_dino_model_name = _infer_dinov2_model_name_from_checkpoint(checkpoint)
+        if (
+            ckpt_dino_model_name is not None
+            and ckpt_dino_model_name != resolved_dino_model_name
+        ):
+            print(
+                "  [NOTE] Config model_name "
+                f"({resolved_dino_model_name}) does not match checkpoint "
+                f"({ckpt_dino_model_name}); using checkpoint model_name "
+                f"({ckpt_dino_model_name})."
+            )
+            resolved_dino_model_name = ckpt_dino_model_name
+
     num_classes = _infer_num_classes_from_checkpoint(checkpoint)
 
     config_use_lora = bool(model_cfg.get("use_lora", True))
@@ -104,6 +136,7 @@ def load_model_from_config(config: dict, device):
         lora_rank=model_cfg["lora_rank"],
         use_lora=resolved_use_lora,
         osnet_weight_path=model_cfg.get("osnet_weights"),
+        dino_model_name=resolved_dino_model_name,
         dino_feature_mode=model_cfg.get("feature_mode", "cls"),
     ).to(device)
 
@@ -187,11 +220,16 @@ def main(config: dict):
     print(f"    Query   : {len(query_records):,} images")
     print(f"    Gallery : {len(gallery_records):,} images")
 
+    query_embs_cache = data_cfg.get("query_embeddings_path")
+    gallery_embs_cache = data_cfg.get("gallery_embeddings_path")
+
     q_embs, q_pids, q_camids = extract_embeddings(
         model=model,
         loader=query_loader,
         device=device,
         show_progress=True,
+        cache_path=query_embs_cache,
+        split_name="query",
     )
 
     g_embs, g_pids, g_camids = extract_embeddings(
@@ -199,6 +237,8 @@ def main(config: dict):
         loader=gallery_loader,
         device=device,
         show_progress=True,
+        cache_path=gallery_embs_cache,
+        split_name="gallery",
     )
 
     print(f"    Embedding dim : {q_embs.shape[1]}")
@@ -270,7 +310,7 @@ def main(config: dict):
         remove_junk=True,
     )
 
-    rank1, mAP = compute_rank1_map(
+    rank1, rank5, rank10, mAP = compute_rank1_map(
         ranked_indices=ranked_indices,
         q_pids=q_pids,
         q_camids=q_camids,
@@ -292,6 +332,8 @@ def main(config: dict):
 
     print(f"\n  ── Results [{mode}{rerank_tag}] ──────────────────")
     print(f"  Rank-1 : {rank1:.4f}  ({rank1 * 100:.2f}%)")
+    print(f"  Rank-5 : {rank5:.4f}  ({rank5 * 100:.2f}%)")
+    print(f"  Rank-10: {rank10:.4f}  ({rank10 * 100:.2f}%)")
     print(f"  mAP    : {mAP:.4f}  ({mAP * 100:.2f}%)")
     print("  ──────────────────────────────────────────")
 

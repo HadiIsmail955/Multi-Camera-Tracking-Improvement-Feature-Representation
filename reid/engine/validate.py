@@ -7,7 +7,7 @@ def validate(
     query_loader,
     gallery_loader,
     device,
-) -> tuple[float, float]:
+) -> tuple[float, float, float, float]:
     q_embs, q_pids, q_camids = extract_embeddings(
         model=model,
         loader=query_loader,

@@ -12,7 +12,7 @@ from reid.data.loaders import (
     build_eval_loader,
 )
 from reid.engine.train import train_model, cosine_with_warmup
-from reid.losses import BHTripletLoss, SupConLoss, ArcFaceLoss
+from reid.losses import BHTripletLoss, SupConLoss, ArcFaceLoss, OcclusionAwareLoss
 from reid.models import build_model
 
 
@@ -96,6 +96,7 @@ def main(config: dict):
         lora_rank=model_cfg["lora_rank"],
         use_lora=model_cfg.get("use_lora", True),
         osnet_weight_path=model_cfg.get("osnet_weights"),
+        dino_model_name=model_cfg.get("model_name", "dinov2_vitb14"),
         dino_feature_mode=model_cfg.get("feature_mode", "cls"),
     ).to(device)
 
@@ -115,6 +116,10 @@ def main(config: dict):
         scale=optim_cfg.get("arcface_scale", 30.0),
         margin=optim_cfg.get("arcface_margin", 0.5),
         easy_margin=optim_cfg.get("arcface_easy_margin", False),
+    )
+
+    occlusion_loss = OcclusionAwareLoss(
+        feature_drop_prob=optim_cfg.get("occlusion_feature_drop_prob", 0.25),
     )
 
     optimizer = build_optimizer(
@@ -139,6 +144,7 @@ def main(config: dict):
         triplet_loss=triplet_loss,
         supcon_loss=supcon_loss,
         arcface_loss=arcface_loss,
+        occlusion_loss=occlusion_loss,
         device=device,
         epochs=optim_cfg["epochs"],
         backbone=model_cfg["backbone"],
@@ -146,6 +152,7 @@ def main(config: dict):
         triplet_weight=optim_cfg["triplet_weight"],
         supcon_weight=optim_cfg.get("supcon_weight", 0.2),
         arcface_weight=optim_cfg.get("arcface_weight", 0.0),
+        occlusion_weight=optim_cfg.get("occlusion_weight", 0.0),
         eval_interval=eval_cfg["interval"],
         checkpoint_dir=output_cfg["checkpoint_dir"],
         log_path=output_cfg["log_path"],

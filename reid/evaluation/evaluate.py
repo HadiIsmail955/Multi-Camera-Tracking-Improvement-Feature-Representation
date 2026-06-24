@@ -14,7 +14,7 @@ def evaluate_reid(
     g_embs: torch.Tensor,
     g_pids: list[int],
     g_camids: list[int],
-) -> tuple[float, float]:
+) -> tuple[float, float, float, float]:
     """
     Standard ReID evaluation using cosine similarity.
 

@@ -12,6 +12,7 @@ def build_model(
     use_lora: bool = True,
     osnet_weight_path: str | None = None,
     dino_feature_mode: str = "cls",
+    dino_model_name: str = "dinov2_vitb14",
 ) -> nn.Module:
     if backbone == "osnet":
         print(f"\nBuilding OSNet baseline  (num_classes={num_classes})")
@@ -35,7 +36,8 @@ def build_model(
         mode = f"LoRA rank={lora_rank}" if use_lora else "full fine-tune"
         print(
             f"\nBuilding DINOv2  "
-            f"(num_classes={num_classes}, {mode}, feature_mode={dino_feature_mode})"
+            f"(num_classes={num_classes}, {mode}, "
+            f"model_name={dino_model_name}, feature_mode={dino_feature_mode})"
         )
         return DINOv2Model(
             num_classes=num_classes,
@@ -44,6 +46,7 @@ def build_model(
             lora_alpha=lora_rank * 2.0,
             embed_dim=256,
             feature_mode=dino_feature_mode,
+            model_name=dino_model_name,
         )
 
     raise ValueError(

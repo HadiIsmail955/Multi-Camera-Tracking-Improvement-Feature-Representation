@@ -10,10 +10,8 @@ from reid.models.lora import inject_lora
 
 class DINOv2Model(nn.Module):
     """
-    DINOv2 ViT-B/14 with full fine-tuning.
+    DINOv2 with configurable backbone variant.
     """
-
-    DINOV2_DIM = 768
 
     def __init__(
         self,
@@ -23,6 +21,7 @@ class DINOv2Model(nn.Module):
         lora_alpha: float = 16.0,
         embed_dim: int = 256,
         feature_mode: str = "cls",
+        model_name: str = "dinov2_vitb14",
     ):
         super().__init__()
 
@@ -31,19 +30,29 @@ class DINOv2Model(nn.Module):
                 f"Invalid feature_mode: {feature_mode!r}. "
                 "Choose 'cls' or 'cls_patchavg'."
             )
+        if model_name not in {"dinov2_vits14", "dinov2_vitb14", "dinov2_vitl14"}:
+            raise ValueError(
+                f"Invalid model_name: {model_name!r}. "
+                "Choose 'dinov2_vits14', 'dinov2_vitb14', or 'dinov2_vitl14'."
+            )
 
         self.feature_mode = feature_mode
+        self.model_name = model_name
 
-        print("  Loading DINOv2 ViT-B/14 from torch.hub...")
+        print(f"  Loading DINOv2 ({model_name}) from torch.hub...")
 
         load_errors = []
+        model_fallbacks = {
+            "dinov2_vits14": ["dinov2_vits14", "dinov2_vits14_reg"],
+            "dinov2_vitb14": ["dinov2_vitb14", "dinov2_vitb14_reg"],
+            "dinov2_vitl14": ["dinov2_vitl14", "dinov2_vitl14_reg"],
+        }
         hub_candidates = [
-            ("facebookresearch/dinov2", "dinov2_vitb14"),
-            ("facebookresearch/dinov2", "dinov2_vitb14_reg"),
-            ("facebookresearch/dinov2", "dinov2_vitb16"),
+            ("facebookresearch/dinov2", entry) for entry in model_fallbacks[model_name]
         ]
 
         self.vit: nn.Module | None = None
+        loaded_entry: str | None = None
 
         for repo, entry in hub_candidates:
             try:
@@ -56,6 +65,7 @@ class DINOv2Model(nn.Module):
                         verbose=False,
                     ),
                 )
+                loaded_entry = entry
                 print(f"  [OK] Loaded {entry} from {repo}")
                 break
 
@@ -82,18 +92,26 @@ class DINOv2Model(nn.Module):
                 param.requires_grad = True
             print("  Full fine-tuning: all ViT parameters unfrozen")
 
-        feat_dim = (
-            self.DINOV2_DIM if self.feature_mode == "cls" else self.DINOV2_DIM * 2
-        )
+        vit_embed_dim = getattr(self.vit, "embed_dim", None)
+        if isinstance(vit_embed_dim, int) and vit_embed_dim > 0:
+            backbone_dim = vit_embed_dim
+        elif loaded_entry is not None and "vitl" in loaded_entry:
+            backbone_dim = 1024
+        elif loaded_entry is not None and "vits" in loaded_entry:
+            backbone_dim = 384
+        else:
+            backbone_dim = 768
+
+        feat_dim = backbone_dim if self.feature_mode == "cls" else backbone_dim * 2
 
         self.head = BNNeck(
             in_dim=feat_dim,
             out_dim=embed_dim,
-            use_proj=True,
+            use_proj=False,
         )
 
-        self.classifier = nn.Linear(embed_dim, num_classes, bias=False)
-        self.embed_dim = embed_dim
+        self.classifier = nn.Linear(self.head.out_dim, num_classes, bias=False)
+        self.embed_dim = self.head.out_dim
 
     def _resize_if_needed(self, x: torch.Tensor) -> torch.Tensor:
         assert self.vit is not None
