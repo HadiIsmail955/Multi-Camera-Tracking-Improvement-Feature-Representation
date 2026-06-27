@@ -12,7 +12,7 @@ def build_args():
         data_root="./DataSet/MTMC_Tracking_2025_Preprocessed",
         base_path=".",
 
-        train_scenes=["Warehouse_000", "Warehouse_001", "Warehouse_002"],
+        train_scenes=["Warehouse_000", "Warehouse_004", "Warehouse_008"],
         val_scenes=["Warehouse_015"],
         val_split="val",
         use_validation=True,
@@ -53,7 +53,7 @@ def build_args():
         batch_size=15 * 6,
 
         eval_batch_size=256,
-        val_every=5,
+        val_every=1,
         max_val_samples=5000,
         val_subset_seed=42,
         max_eval_pairs=50000,        
@@ -95,9 +95,9 @@ def build_args():
         eval_embedding_key="bn_embedding",
 
         resume=None,
-        # resume="./outputs_reid/dinov2_reid_embedding_v2_20260606_185503/checkpoints/last.pt",
-        # resume="./outputs_reid/dinov2_reid_embedding_v2_20260605_013033/checkpoints/last.pt",
-        load_model=None,
+        # resume="./outputs_reid/dinov2_reid_embedding_v2_20260613_211015/checkpoints/last.pt",
+        # load_model=None,
+        load_model="./outputs_reid/dinov2_reid_embedding_v2_20260613_211015/checkpoints/last.pt",
 
         resume_add_epochs=0,
         resume_reset_optimizer=False,

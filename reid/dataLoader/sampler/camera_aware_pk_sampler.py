@@ -108,10 +108,6 @@ class CameraAwarePKBatchSampler(Sampler):
 
     @staticmethod
     def _safe_sample(pool, k):
-        """
-        Sample without replacement when possible.
-        Use replacement only if the pool is smaller than k.
-        """
         pool = list(pool)
 
         if k <= 0:
@@ -127,9 +123,6 @@ class CameraAwarePKBatchSampler(Sampler):
 
     @staticmethod
     def _safe_sample_without_used(pool, k, used):
-        """
-        Sample from pool while avoiding already-used indices when possible.
-        """
         candidates = [idx for idx in pool if idx not in used]
 
         if k <= 0:
@@ -144,14 +137,6 @@ class CameraAwarePKBatchSampler(Sampler):
         return candidates
 
     def _try_add_source_clean_pair_for_occlusion(self, label, selected, used):
-        """
-        Try to choose an occluded crop and its source clean crop.
-
-        This is ideal for occlusion-invariant ReID because the batch contains:
-            clean image and occluded version of the same underlying crop.
-
-        If source paths are unavailable or not found, this returns False.
-        """
         if "source_crop_path_resolved" not in self.dataset.df.columns:
             return False
 
@@ -190,9 +175,6 @@ class CameraAwarePKBatchSampler(Sampler):
         return False
 
     def _sample_required_occlusion_mix(self, label, selected, used):
-        """
-        Add clean/occluded samples for a label when possible.
-        """
         if not self.occlusion_aware:
             return
 
@@ -297,16 +279,6 @@ class CameraAwarePKBatchSampler(Sampler):
                 break
 
     def _sample_indices_for_label(self, label):
-        """
-        Sample K images for one identity.
-
-        Strategy:
-            1. Add one clean + one occluded positive when possible.
-            2. Add same-camera samples for stable positives.
-            3. Add cross-camera samples for hard positives.
-            4. Fill from unused samples of this identity.
-            5. Use replacement only as final fallback.
-        """
         all_indices = self.label_to_indices[label]
 
         selected = []

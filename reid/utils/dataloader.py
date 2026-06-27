@@ -1,5 +1,5 @@
 from torch.utils.data import DataLoader, Subset, Dataset
-from ..dataLoader.sampler.camera_aware_pk_sampler import CameraAwarePKBatchSampler
+from ..dataLoader.sampler.camera_aware_pk_sampler import CameraAwarePKBatchSampler, log_info
 import torch
 
 def build_train_loader(train_dataset, args, logger=None):

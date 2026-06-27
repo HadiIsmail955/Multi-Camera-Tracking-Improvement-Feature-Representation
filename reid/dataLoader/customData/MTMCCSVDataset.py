@@ -8,17 +8,6 @@ from torch.utils.data import Dataset
 
 
 class MTMCCSVDataset(Dataset):
-    """
-    CSV dataset for MTMC/ReID crop training.
-
-    Subproject-2 additions:
-      - supports normal crops and occlusion crops from one combined metadata.csv
-      - resolves both crops/ and occlusion_crops/ paths correctly
-      - exposes is_occluded, data_subset, augmentation, and source_crop_path
-      - supports clean-only validation by setting include_occlusion_crops=False
-      - keeps scene-aware identity labels to avoid mixing IDs across scenes
-    """
-
     def __init__(
         self,
         root,
@@ -529,8 +518,6 @@ class MTMCCSVDataset(Dataset):
         normalized = raw_path.replace("\\", "/").replace("./", "")
         lower_normalized = normalized.lower()
 
-        # IMPORTANT: check occlusion_crops before crops because
-        # 'occlusion_crops/' also contains the substring 'crops/'.
         token = "occlusion_crops/"
         if token in lower_normalized:
             start = lower_normalized.index(token) + len(token)
