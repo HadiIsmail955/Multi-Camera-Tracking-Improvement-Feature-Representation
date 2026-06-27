@@ -8,6 +8,7 @@ data/
 DataSet
 outputs_reid/
 logs/
+third_party/
 
 .ipynb_checkpoints/
 
