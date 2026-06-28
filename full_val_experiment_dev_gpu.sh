@@ -37,8 +37,10 @@ export PYTHONUNBUFFERED=1
 
 CHECKPOINT="./outputs_reid/dinov2_reid_embedding_v2_20260613_211015/checkpoints/last.pt"
 DATA_ROOT="DataSet/MTMC_Tracking_2025_Preprocessed"
-OUT_DIR="outputs_reid/outputs_full_reid_diagnosis_tracklet_paper/$(date +%Y%m%d_%H%M%S)"
+# OUT_DIR="outputs_reid/outputs_full_reid_diagnosis_tracklet_paper/$(date +%Y%m%d_%H%M%S)"
 PAPER_CKPT="third_party/Glance-MCMT/deep-person-reid/checkpoints/osnet_ain_ms_m_c.pth.tar"
+PAPER_AIN_CKPT="third_party/Glance-MCMT/deep-person-reid/checkpoints/osnet_ain_ms_m_c.pth.tar"
+OUT_DIR="outputs_reid/final_paper_text_osnet_ain_val_tracklet_$(date +%Y%m%d_%H%M%S)"
 
 echo "Python:"
 which python
@@ -68,9 +70,9 @@ echo "========================================"
 
 python -u -m script.con_v1_0.val_experiment \
   --model_type paper_osnet_ain \
-  --paper_model_name osnet_x1_0 \
+  --paper_model_name osnet_ain_x1_0 \
   --no-paper_pretrained \
-  --paper_checkpoint "$PAPER_CKPT" \
+  --paper_checkpoint "$PAPER_AIN_CKPT" \
   --data_root "$DATA_ROOT" \
   --split val \
   --out_dir "$OUT_DIR" \
@@ -80,10 +82,10 @@ python -u -m script.con_v1_0.val_experiment \
   --embedding_key bn_embedding \
   --identity_col identity_key \
   --cluster_method dbscan \
+  --dbscan_eps 0.025 \
   --min_samples 2 \
   --run_eps_grid \
-  --dbscan_eps 0.025 \
-  --eps_values 0.012 0.015 0.018 0.020 0.022 0.025 0.028 0.030 0.035 0.040 \
+  --eps_values 0.025 0.03 0.0325 0.035 0.0375 0.04 0.0425 0.045 0.0475 0.05 \
   --include_occlusion_crops \
   --batch_size 256 \
   --workers "$SLURM_CPUS_PER_TASK" \

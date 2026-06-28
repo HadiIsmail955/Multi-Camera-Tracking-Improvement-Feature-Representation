@@ -1,0 +1,14 @@
+cluster_label,dominant_identity,dominant_count,cluster_total,num_real_ids,purity
+123,Warehouse_016__FourierGR1T2_0352,10,40,5,0.25
+80,Warehouse_015__Person_0197,10,29,3,0.3448275862068966
+94,Warehouse_015__Person_0193,10,28,3,0.35714285714285715
+62,Warehouse_015__Person_0009,10,27,3,0.37037037037037035
+28,Hospital_000__Person_0022,11,22,2,0.5
+75,Warehouse_015__Person_0169,11,22,2,0.5
+60,Warehouse_015__Person_0006,9,18,2,0.5
+65,Warehouse_015__Person_0012,9,17,2,0.5294117647058824
+0,Hospital_000__Person_0000,10,16,2,0.625
+24,Hospital_000__Person_0018,9,16,2,0.5625
+122,Warehouse_015__Transporter_0007,10,14,2,0.7142857142857143
+52,Warehouse_015__Forklift_0182,5,9,2,0.5555555555555556
+47,Hospital_000__Person_0037,2,4,2,0.5
