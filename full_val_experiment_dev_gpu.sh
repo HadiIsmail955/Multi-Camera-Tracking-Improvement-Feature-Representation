@@ -84,8 +84,6 @@ python -u -m script.con_v1_0.val_experiment \
   --cluster_method dbscan \
   --dbscan_eps 0.025 \
   --min_samples 2 \
-  --run_eps_grid \
-  --eps_values 0.025 0.03 0.0325 0.035 0.0375 0.04 0.0425 0.045 0.0475 0.05 \
   --include_occlusion_crops \
   --batch_size 256 \
   --workers "$SLURM_CPUS_PER_TASK" \
@@ -94,7 +92,7 @@ python -u -m script.con_v1_0.val_experiment \
   --reduce_method pca \
   --make_3d_plots \
   --reduce_3d_method pca \
-  --max_plot_points 50000
+  --max_plot_points 500000
 
   # --checkpoint "$CHECKPOINT" \
   # --data_root "$DATA_ROOT" \
