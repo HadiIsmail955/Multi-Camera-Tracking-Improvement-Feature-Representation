@@ -50,10 +50,10 @@ class OSNetBaseline(nn.Module):
         self.head = BNNeck(
             in_dim=backbone_dim,
             out_dim=256,
-            use_proj=True,
+            use_proj=False,
         )
 
-        self.classifier = nn.Linear(256, num_classes, bias=False)
+        self.classifier = nn.Linear(backbone_dim, num_classes, bias=False)
 
         self.embed_dim = 256
         self.backbone_dim = backbone_dim

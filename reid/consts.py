@@ -1,5 +1,7 @@
 from typing import Final
 
+# 384 x 192 or 256 x 128 
+# The original OSNet paper uses 256 x 128, while the DINOv2 paper uses 384 x 192.
 IMAGE_HEIGHT: Final[int] = 256
 IMAGE_WIDTH: Final[int] = 128
 

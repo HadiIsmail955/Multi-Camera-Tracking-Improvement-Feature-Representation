@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from tqdm import tqdm
 
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, HDBSCAN
 from sklearn.preprocessing import normalize
 import numpy as np
 
@@ -214,6 +214,35 @@ def _pool_dbscan(
     return group[labels == largest_cluster].mean(dim=0), False
 
 
+def _pool_hdbscan(
+    group: torch.Tensor,
+    hdbscan_min_cluster_size: int,
+    hdbscan_min_samples: int | None,
+) -> tuple[torch.Tensor, bool]:
+
+    if len(group) < hdbscan_min_cluster_size:
+        return group.mean(dim=0), True
+
+    feats = normalize(group.detach().cpu().numpy(), norm="l2")
+    labels = (
+        HDBSCAN(
+            min_cluster_size=hdbscan_min_cluster_size,
+            min_samples=hdbscan_min_samples,
+            metric="cosine",
+        )
+        .fit(feats)
+        .labels_
+    )
+
+    valid_mask = labels >= 0
+    if not np.any(valid_mask):
+        return group.mean(dim=0), True
+
+    unique_labels, counts = np.unique(labels[valid_mask], return_counts=True)
+    largest_cluster = unique_labels[np.argmax(counts)]
+    return group[labels == largest_cluster].mean(dim=0), False
+
+
 def _pool_gem(group: torch.Tensor, gem_p: float = 3.0) -> torch.Tensor:
     if len(group) == 1:
         return group[0]
@@ -232,7 +261,9 @@ def pool_tracklet_embeddings(
     tracklet_ids: list[str],
     pool: str = "mean",
     dbscan_eps: float = 0.2,
-    dbscan_min_samples: int = 3,
+    dbscan_min_samples: int = 4,
+    hdbscan_min_cluster_size: int = 4,
+    hdbscan_min_samples: int | None = None,
     consensus_k: int = 10,
     weighted_temperature: float = 10.0,
 ):
@@ -249,6 +280,9 @@ def pool_tracklet_embeddings(
 
         dbscan
             DBSCAN -> largest non-noise cluster -> mean pool.
+
+        hdbscan
+            HDBSCAN -> largest non-noise cluster -> mean pool.
 
         weighted
             Similarity-weighted pooling using all embeddings.
@@ -271,7 +305,16 @@ def pool_tracklet_embeddings(
         )
     """
 
-    valid_pools = ("mean", "max", "dbscan", "weighted", "medoid", "consensus", "gem")
+    valid_pools = (
+        "mean",
+        "max",
+        "dbscan",
+        "hdbscan",
+        "weighted",
+        "medoid",
+        "consensus",
+        "gem",
+    )
     if pool not in valid_pools:
         raise ValueError(f"pool must be one of {valid_pools}, got '{pool}'")
 
@@ -301,6 +344,7 @@ def pool_tracklet_embeddings(
 
     pooled_embs: list[torch.Tensor] = []
     num_dbscan_fallbacks = 0
+    num_hdbscan_fallbacks = 0
 
     for tid in order:
         group = embs[indices_by_tracklet[tid]]  # [k, D]
@@ -320,6 +364,13 @@ def pool_tracklet_embeddings(
             pooled_embs.append(emb)
             if fallback:
                 num_dbscan_fallbacks += 1
+        elif pool == "hdbscan":
+            emb, fallback = _pool_hdbscan(
+                group, hdbscan_min_cluster_size, hdbscan_min_samples
+            )
+            pooled_embs.append(emb)
+            if fallback:
+                num_hdbscan_fallbacks += 1
         elif pool == "gem":
             pooled_embs.append(_pool_gem(group))
 
@@ -329,6 +380,10 @@ def pool_tracklet_embeddings(
 
     if pool == "dbscan":
         print(f"DBSCAN fallbacks: {num_dbscan_fallbacks:,}/{len(order):,} tracklets")
+    elif pool == "hdbscan":
+        print(
+            f"HDBSCAN fallbacks: {num_hdbscan_fallbacks:,}/{len(order):,} tracklets"
+        )
 
     print(
         f"Pooled from {embs.shape[0]:,} images into {len(order):,} tracklet embeddings"

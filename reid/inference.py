@@ -241,7 +241,8 @@ def main(config: dict):
         split_name="gallery",
     )
 
-    print(f"    Embedding dim : {q_embs.shape[1]}")
+    print(f"    Query embeddings  : {list(q_embs.shape)}")
+    print(f"    Gallery embeddings: {list(g_embs.shape)}")
 
     # Tracklet pooling
     tracklet_pool = data_cfg.get("tracklet_pool", None)  # "mean" | "max" | None
@@ -360,6 +361,18 @@ def main(config: dict):
     print(f"\n  Saved: {output_cfg['distance_matrix']}")
     print(f"  Saved: {output_cfg['matching_results']}")
 
+    pooled_embs_path = output_cfg["distance_matrix"].replace("distance_matrix.pt", "pooled_tracklet_embeddings.pt")
+    
+    torch.save({
+        "q_embs": q_embs,
+        "q_pids": q_pids,
+        "q_camids": q_camids,
+        "g_embs": g_embs,
+        "g_pids": g_pids,
+        "g_camids": g_camids
+    }, pooled_embs_path)
+    
+    print(f"  Saved pooled tracklet embeddings: {pooled_embs_path}")
 
 def parse_args():
     parser = argparse.ArgumentParser(
