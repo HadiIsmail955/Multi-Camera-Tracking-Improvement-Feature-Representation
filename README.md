@@ -1097,6 +1097,119 @@ Use DINOv2 + DBSCAN eps=0.045 as the main final result.
 Report DINOv2 + HDBSCAN MCS=3 as a high-coverage comparison.
 ```
 
+## Important Note on Tracklet-Level Occlusion Labels
+
+The occlusion-aware evaluation is performed at **tracklet level**, not at individual image-crop level.  
+This is important when interpreting the clean and occluded failure values.
+
+During tracklet aggregation, multiple crop embeddings are grouped into one final tracklet embedding.  
+The tracklet occlusion label is computed using a strict rule:
+
+```python
+is_occluded = max(is_occluded values of all crops in the tracklet)
+```
+
+This means:
+
+```text
+If any crop inside a tracklet is occluded,
+the whole aggregated tracklet is labeled as occluded.
+```
+
+For example:
+
+```text
+Tracklet A
+├── crop 1: clean
+├── crop 2: clean
+├── crop 3: clean
+├── crop 4: occluded
+└── crop 5: clean
+
+Final tracklet label:
+is_occluded = 1
+```
+
+So a tracklet with mostly clean crops can still be counted as occluded if it contains even one occluded crop.
+
+
+
+### Why the Number of Clean Tracklets Is Low
+
+For the final DINOv2 + DBSCAN result, the occlusion-aware split is:
+
+| Tracklet type | Count |
+|---|---:|
+| Fully clean tracklets | 76 |
+| Tracklets with at least one occluded crop | 1438 |
+| Total tracklets | 1514 |
+
+This does **not** mean that the validation set has only 76 clean crop images.  
+It means only 76 aggregated tracklets contain **zero occluded crops**.
+
+The current definition is strict:
+
+```text
+clean tracklet = all crops inside the tracklet are clean
+occluded tracklet = at least one crop inside the tracklet is occluded
+```
+
+Therefore, the clean tracklet count becomes small because many tracklets contain at least one occluded crop.
+
+
+
+### Effect on Occlusion-Aware Failure Values
+
+Because only 76 tracklets are fully clean, some clean-sample rates can look high or unstable.
+
+For the final DINOv2 + DBSCAN result:
+
+```text
+Clean noise rate = 56 / 76 = 73.68%
+Occluded noise rate = 222 / 1438 = 15.44%
+
+Clean miscluster rate = 0 / 76 = 0.00%
+Occluded miscluster rate = 146 / 1438 = 10.15%
+```
+
+The key interpretation is:
+
+- The high clean noise rate is affected by the small number of fully clean tracklets.
+- Clean tracklets were not misclustered.
+- Most wrong assignments came from tracklets that contain at least one occluded crop.
+- Occlusion remains the main remaining failure case.
+
+
+
+### More Fair Alternative: Occluded Crop Ratio
+
+A better interpretation can use `occluded_crop_ratio`, which measures how much of a tracklet is occluded:
+
+```python
+occluded_crop_ratio = mean(is_occluded values of all crops in the tracklet)
+```
+
+Instead of only using a binary clean/occluded label, tracklets can be grouped by occlusion level:
+
+| Tracklet category | Definition |
+|---|---|
+| Fully clean | `occluded_crop_ratio = 0` |
+| Slightly occluded | `0 < occluded_crop_ratio <= 0.25` |
+| Moderately occluded | `0.25 < occluded_crop_ratio <= 0.50` |
+| Heavily occluded | `occluded_crop_ratio > 0.50` |
+
+This would give a more detailed occlusion analysis than the strict binary rule.
+
+
+
+### Report Wording
+
+A clear way to describe this in the report is:
+
+```text
+Occlusion-aware failure analysis is computed at tracklet level. A tracklet is labeled as occluded if at least one crop inside it is occluded. Therefore, the clean group only contains tracklets with no occluded crops at all. This strict definition explains why only 76 tracklets are counted as fully clean. The result should be interpreted as a tracklet-level occlusion analysis rather than an image-level clean/occluded count.
+```
+
 
 ## Final Results
 
