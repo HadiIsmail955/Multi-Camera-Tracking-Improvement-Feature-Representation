@@ -170,19 +170,115 @@ Failure analysis and visualization
 
 ---
 
+## Datasets Used
+
+The experiments use the preprocessed MTMC dataset stored under:
+
+```text
+DataSet/MTMC_Tracking_2025_Preprocessed/
+```
+
+The dataset is organized into `train` and `val` splits. Each scene contains a `metadata.csv` file and extracted 2D crop images.
+
+---
+
+### Training Dataset
+
+The DINOv2 ReID model was trained on the **training split**:
+
+```text
+DataSet/MTMC_Tracking_2025_Preprocessed/train/
+```
+
+The training data consists of 2D object/person crops extracted from multi-camera video scenes.  
+Each crop is linked to metadata containing the scene, camera, frame, object identity, and bounding box information.
+
+Training scenes used for the project:
+
+```text
+Warehouse_001
+Warehouse_002
+Warehouse_003
+Warehouse_004
+```
+
+A training run used approximately:
+
+| Training property | Value |
+|---|---:|
+| Crop samples | 547,933 |
+| Identity classes | 50 |
+| Cameras | 42 |
+| Input type | 2D image crops extracted from videos |
+| Occlusion crops | Included |
+| Training level | Crop-level |
+| Evaluation level after training | Tracklet-level |
+
+The model was trained for **12 total epochs**:
+
+| Stage | Epochs | Backbone Setting |
+|---|---:|---|
+| Stage 1 | 10 | Frozen DINOv2 backbone |
+| Stage 2 | 2 | Last two DINOv2 blocks unfrozen |
+
+---
+
+### Validation Dataset
+
+The final validation experiments were performed on the **validation split**:
+
+```text
+DataSet/MTMC_Tracking_2025_Preprocessed/val/
+```
+
+The validation set contains four scenes:
+
+| Validation scene | Metadata rows |
+|---|---:|
+| `Hospital_000` | 133,915 |
+| `Lab_000` | 14,112 |
+| `Warehouse_015` | 282,863 |
+| `Warehouse_016` | 54,105 |
+
+Final validation summary:
+
+| Validation property | Value |
+|---|---:|
+| Total crop samples | 484,689 |
+| Validation identities | 131 |
+| Tracklet embeddings after aggregation | 1,514 |
+| Embedding dimension | 512 |
+| Tracklet grouping | `global_id_camera` |
+| Aggregation | `mean_topk` |
+
+The validation pipeline first extracts crop-level embeddings, then aggregates them into tracklet-level embeddings.  
+The final reported results are based on these **1,514 tracklet embeddings**.
+
+---
+
+### Dataset Role in the Pipeline
+
+| Dataset split | Used for | Level |
+|---|---|---|
+| `train` | Training the DINOv2 ReID model | Crop-level |
+| `val` | Retrieval, similarity, DBSCAN/HDBSCAN clustering, and failure analysis | Tracklet-level |
+
+The OSNet baselines were not trained on this dataset. They were used as pretrained ReID baselines and evaluated on the same validation split for comparison.
+
 ## Data Preprocessing
 
-The preprocessing module prepares image crops from multi-camera video data.
+The preprocessing stage converts raw multi-camera videos and metadata into ReID-ready crop images.  
+This step is important because the ReID model does not train directly on full video frames. Instead, it trains on cropped objects/persons extracted from detections or tracking metadata.
 
-Main files:
+Main preprocessing files:
 
 | File | Purpose |
 |---|---|
 | `DataPreprocessing/main.py` | Main preprocessing entry point |
-| `DataPreprocessing/extract_crops.py` | Extracts detection crops from frames/videos |
-| `DataPreprocessing/target_video_grid.py` | Utility for visualizing or organizing target video views |
+| `DataPreprocessing/extract_crops.py` | Extracts object/person crops from video frames using metadata |
+| `DataPreprocessing/target_video_grid.py` | Utility for checking or visualizing camera/video layout |
 
-Expected preprocessed structure:
+Expected preprocessed dataset structure:
 
 ```text
 DataSet/MTMC_Tracking_2025_Preprocessed/
@@ -196,7 +292,126 @@ DataSet/MTMC_Tracking_2025_Preprocessed/
         └── crops/
 ```
 
+The metadata file is used to locate objects in the video frames and associate each crop with:
+
+- scene name
+- camera ID
+- frame ID
+- object/person ID
+- bounding box coordinates
+- visibility or occlusion information when available
+
+The preprocessing pipeline supports:
+
+- extracting 2D image crops from videos
+- filtering invalid or very small crops
+- padding small objects when needed
+- removing or reducing overlapping detections
+- saving crops in a structure suitable for ReID training and validation
+- preserving camera and identity information for cross-camera evaluation
+
+For the final ReID experiments, crop embeddings are later aggregated into tracklet-level embeddings using:
+
+```text
+tracklet_group_mode = global_id_camera
+aggregation = mean_topk
+```
+
+This means that multiple crop embeddings belonging to the same identity-camera tracklet are combined into one representative tracklet embedding.
+
 ---
+
+## Occlusion Handling
+
+Occlusion is a major challenge in multi-camera ReID because the same identity may appear partially hidden, truncated, or visually incomplete in some cameras.  
+To make the model more robust, the pipeline includes occlusion-aware crop handling and occlusion-based training support.
+
+Occlusion handling is used in three ways:
+
+### 1. Occlusion-aware preprocessing
+
+During preprocessing, the dataset can include both normal crops and occluded crops.  
+Occluded samples are kept because they represent realistic tracking conditions in multi-camera scenes.
+
+The preprocessing stage can also apply filtering and padding to improve crop quality:
+
+| Step | Purpose |
+|---|---|
+| Small-object padding | Adds context around very small crops |
+| Overlap filtering | Reduces duplicate or heavily overlapping detections |
+| Crop extraction | Saves object/person crops from frame metadata |
+| Occlusion crop inclusion | Keeps occluded examples for robustness |
+
+### 2. Occlusion-aware training
+
+During training, occluded crops can be included using:
+
+```text
+include_occlusion_crops = True
+```
+
+This helps the model learn embeddings that remain stable even when objects are partially visible.
+
+The training objective may also include an occlusion consistency component:
+
+```text
+total_loss =
+    id_weight * CE
+  + triplet_weight * Triplet
+  + contrastive_weight * SupCon
+  + occlusion_consistency_weight * OcclusionConsistency
+```
+
+The goal is to make embeddings from normal and occluded views of the same identity closer in feature space.
+
+### 3. Occlusion-aware evaluation and failure analysis
+
+The validation pipeline reports separate failure statistics for clean and occluded samples, including:
+
+| Metric | Meaning |
+|---|---|
+| `clean_noise_rate` | Percentage of clean samples marked as noise |
+| `occluded_noise_rate` | Percentage of occluded samples marked as noise |
+| `clean_miscluster_rate` | Percentage of clean samples assigned to wrong clusters |
+| `occluded_miscluster_rate` | Percentage of occluded samples assigned to wrong clusters |
+
+These metrics help identify whether clustering errors are mainly caused by occlusion.
+
+In the final DINOv2 DBSCAN result, clean samples had no misclustered samples, while most wrong assignments came from occluded samples. This shows that occlusion is one of the main remaining failure cases.
+
+---
+
+## Preprocessing and Occlusion Summary
+
+The full data preparation and occlusion-aware pipeline can be summarized as:
+
+```text
+Raw video frames + metadata
+        |
+        v
+Detection / tracking boxes
+        |
+        v
+Crop extraction
+        |
+        v
+Small-object padding and overlap filtering
+        |
+        v
+Normal + occluded crop dataset
+        |
+        v
+DINOv2 ReID training with occlusion-aware samples
+        |
+        v
+Tracklet-level embedding aggregation
+        |
+        v
+Retrieval + clustering + occlusion failure analysis
+```
+
+This preprocessing and occlusion handling improves the realism of the ReID evaluation because the model is tested under challenging multi-camera conditions rather than only clean isolated crops.
+
 
 ## Model Architecture
 
@@ -304,6 +519,43 @@ Training backend:
 reid/train/train_reid.py
 ```
 
+
+### Training Data and Schedule
+
+The ReID model was trained on the preprocessed MTMC training split. The training data consists of object/person crops extracted from multi-camera video scenes and organized using the metadata files generated during preprocessing.
+
+Training was performed in two stages:
+
+| Stage | Epochs | Backbone Setting | Description |
+|---|---:|---|---|
+| Stage 1 | 10 epochs | Frozen DINOv2 backbone | Train the ReID projection head, BNNeck, and classifier while keeping the DINOv2 backbone fixed |
+| Stage 2 | 2 epochs | Last two DINOv2 blocks unfrozen | Fine-tune the last two backbone layers together with the ReID head |
+
+Total training length:
+
+```text
+10 frozen-backbone epochs + 2 fine-tuning epochs = 12 total epochs
+```
+
+This schedule was used to keep the pretrained DINOv2 representation stable during early training, then adapt the final backbone layers to the MTMC ReID task.
+
+### Training Configuration Notes
+
+Important training settings used in the final model:
+
+| Setting | Value |
+|---|---|
+| Backbone | DINOv2 |
+| Backbone stage 1 | Frozen for 10 epochs |
+| Backbone stage 2 | Last two blocks unfrozen for 2 epochs |
+| Total epochs | 12 |
+| Crop type | Normal + occlusion-aware crops |
+| Occlusion crops | Included during training |
+| Input level | 2D image crops extracted from videos |
+| Evaluation level | Tracklet-level embeddings |
+
+
+
 Example command:
 
 ```bash
@@ -311,7 +563,7 @@ python -u -m script.con_v1_0.train_experiment \
   --data_root DataSet/MTMC_Tracking_2025_Preprocessed \
   --output_dir outputs_reid/dinov2_reid \
   --batch_size 128 \
-  --epochs 30
+  --epochs 12
 ```
 
 On SLURM, use:
@@ -319,28 +571,6 @@ On SLURM, use:
 ```bash
 sbatch full_experiment_dev_gpu.sh
 ```
-
----
-
-## Training Strategy
-
-The final DINOv2 ReID model was trained in two stages for a total of **12 epochs**.
-
-| Stage | Epochs | Backbone Setting | Purpose |
-|---|---:|---|---|
-| Stage 1 | 10 epochs | DINOv2 backbone frozen | Train the ReID projection head, BNNeck, and classifier while preserving the pretrained DINOv2 representation |
-| Stage 2 | 2 epochs | Last two DINOv2 backbone blocks unfrozen | Fine-tune the highest-level visual features for the multi-camera ReID task |
-
-Final training schedule:
-
-```text
-Total training epochs = 12
-Frozen backbone training = 10 epochs
-Fine-tuning with last 2 backbone blocks unfrozen = 2 epochs
-```
-
-This strategy keeps the pretrained DINOv2 representation stable during most of training, then allows limited task-specific adaptation near the end.
-
 
 ---
 
