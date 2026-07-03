@@ -13,7 +13,7 @@ The project focuses on:
 - Retrieval evaluation using Rank-k and mAP
 - Failure analysis for noise, fragmentation, and identity merges
 
----
+
 
 ## Project Motivation
 
@@ -29,7 +29,7 @@ This is difficult because of:
 
 This project improves the feature representation stage by training and evaluating a DINOv2-based ReID model and comparing it with OSNet baselines.
 
----
+
 
 ## Main Contributions
 
@@ -64,7 +64,7 @@ This project improves the feature representation stage by training and evaluatin
    - cluster diagnosis plots
    - real identity vs predicted cluster visualizations
 
----
+
 
 ## Repository Structure
 
@@ -136,7 +136,7 @@ project-root/
 └── README.md
 ```
 
----
+
 
 ## Pipeline Overview
 
@@ -168,7 +168,7 @@ DBSCAN / HDBSCAN clustering
 Failure analysis and visualization
 ```
 
----
+
 
 ## Datasets Used
 
@@ -180,7 +180,7 @@ DataSet/MTMC_Tracking_2025_Preprocessed/
 
 The dataset is organized into `train` and `val` splits. Each scene contains a `metadata.csv` file and extracted 2D crop images.
 
----
+
 
 ### Training Dataset
 
@@ -221,7 +221,7 @@ The model was trained for **12 total epochs**:
 | Stage 1 | 10 | Frozen DINOv2 backbone |
 | Stage 2 | 2 | Last two DINOv2 blocks unfrozen |
 
----
+
 
 ### Validation Dataset
 
@@ -254,7 +254,7 @@ Final validation summary:
 The validation pipeline first extracts crop-level embeddings, then aggregates them into tracklet-level embeddings.  
 The final reported results are based on these **1,514 tracklet embeddings**.
 
----
+
 
 ### Dataset Role in the Pipeline
 
@@ -319,7 +319,7 @@ aggregation = mean_topk
 
 This means that multiple crop embeddings belonging to the same identity-camera tracklet are combined into one representative tracklet embedding.
 
----
+
 
 ## Occlusion Handling
 
@@ -379,7 +379,7 @@ These metrics help identify whether clustering errors are mainly caused by occlu
 
 In the final DINOv2 DBSCAN result, clean samples had no misclustered samples, while most wrong assignments came from occluded samples. This shows that occlusion is one of the main remaining failure cases.
 
----
+
 
 ## Preprocessing and Occlusion Summary
 
@@ -448,7 +448,7 @@ Classifier
 
 The model outputs embeddings used for both classification and metric learning.
 
----
+
 
 ## Paper Baselines
 
@@ -472,7 +472,7 @@ model_name = osnet_ain_x1_0
 checkpoint = osnet_ain_ms_m_c.pth.tar
 ```
 
----
+
 
 ## Training Losses
 
@@ -503,7 +503,7 @@ total_loss =
   + occlusion_consistency_weight * OcclusionConsistency
 ```
 
----
+
 
 ## Training
 
@@ -572,7 +572,7 @@ On SLURM, use:
 sbatch full_experiment_dev_gpu.sh
 ```
 
----
+
 
 ## Validation and Diagnostics
 
@@ -593,7 +593,7 @@ The validation pipeline performs:
 7. cluster failure analysis
 8. 2D and 3D visualization export
 
----
+
 
 ## DBSCAN Evaluation
 
@@ -628,7 +628,7 @@ python -u -m script.con_v1_0.val_experiment \
   --max_plot_points 50000
 ```
 
----
+
 
 ## HDBSCAN Evaluation
 
@@ -663,7 +663,7 @@ python -u -m script.con_v1_0.val_experiment \
   --max_plot_points 50000
 ```
 
----
+
 
 ## Evaluation Metrics
 
@@ -701,7 +701,309 @@ python -u -m script.con_v1_0.val_experiment \
 | NMI | Normalized Mutual Information |
 | Silhouette cosine | Cluster separation score using cosine distance |
 
----
+
+
+## Multiple Queries per Identity
+
+In ReID evaluation, one identity can appear many times across different cameras and tracklets.  
+Therefore, the validation is not based on a single image per identity. Instead, each identity can have multiple query examples.
+
+The evaluation works as follows:
+
+```text
+Identity A
+├── Camera 1 / Tracklet 1  -> query example
+├── Camera 2 / Tracklet 2  -> gallery candidate
+├── Camera 3 / Tracklet 3  -> gallery candidate
+└── Camera 4 / Tracklet 4  -> gallery candidate
+```
+
+Each tracklet embedding can be used as a query and compared against the remaining gallery tracklets.  
+A correct retrieval happens when another tracklet with the same identity appears in the top-ranked results.
+
+This is important because the same object/person may look different depending on:
+
+- camera viewpoint
+- occlusion
+- lighting
+- crop quality
+- distance from the camera
+- partial visibility
+- background clutter
+
+The final evaluation uses **tracklet-level embeddings**, not only single crop embeddings.  
+This makes the evaluation more stable because multiple crop embeddings from the same identity-camera tracklet are aggregated into one representative embedding.
+
+Final evaluation setup:
+
+| Setting | Value |
+|---|---|
+| Evaluation level | Tracklet-level |
+| Tracklet grouping | `global_id_camera` |
+| Aggregation method | `mean_topk` |
+| Number of tracklet embeddings | 1514 |
+| Number of identities | 131 |
+| Embedding dimension | 512 |
+
+The purpose of multiple queries per identity is to test whether the model can retrieve the same identity under different camera conditions.
+
+
+
+## Inference Explanation
+
+During inference, the ReID model does not directly predict a new identity class.  
+Instead, it extracts an embedding vector that represents the visual appearance of the crop or tracklet.
+
+The inference pipeline is:
+
+```text
+Input crop or tracklet
+        |
+        v
+DINOv2 ReID model
+        |
+        v
+512-dimensional embedding
+        |
+        v
+L2 normalization
+        |
+        v
+Cosine similarity comparison
+        |
+        v
+Nearest gallery matches
+```
+
+For crop-level inference:
+
+```text
+image crop -> model -> embedding
+```
+
+For tracklet-level inference:
+
+```text
+multiple crops from same tracklet
+        |
+        v
+extract embedding for each crop
+        |
+        v
+aggregate embeddings using mean_topk
+        |
+        v
+final tracklet embedding
+```
+
+Matching is performed by comparing the query embedding with gallery embeddings using cosine similarity.
+
+```text
+higher cosine similarity = more likely same identity
+lower cosine similarity  = more likely different identity
+```
+
+The model is therefore used as a **feature extractor**.  
+The final identity association is decided by retrieval or clustering, not by the classifier head alone.
+
+### What is Compared During Inference?
+
+The comparison is between embeddings:
+
+```text
+query tracklet embedding  <->  gallery tracklet embeddings
+```
+
+The gallery embeddings are ranked by similarity.  
+The highest-ranked gallery tracklets are considered the most likely matches.
+
+This is why Rank-1, Rank-5, Rank-10, Rank-20, and mAP are used as retrieval metrics.
+
+
+
+## Occlusion Augmentation
+
+Occlusion is added during training to make the ReID model more robust to real-world partial visibility.  
+In multi-camera tracking, an object/person may be partially blocked by another object, another person, equipment, shelves, or scene clutter.
+
+To simulate this, artificial occlusion is applied to some training crops.
+
+The idea is:
+
+```text
+original object crop
+        +
+random patch from another part of the image / scene
+        =
+occluded object crop
+```
+
+Instead of simply using a black rectangle or random noise, the occluder can be created using a crop or patch taken from another part of the image or scene.  
+This makes the occlusion more realistic because the blocking region looks like real background or real scene content.
+
+Example process:
+
+```text
+1. Take an object/person crop.
+2. Select a random patch from another image region or another crop.
+3. Resize or place the patch over part of the object crop.
+4. Use the modified crop as an occluded training sample.
+```
+
+This creates training examples where parts of the object are hidden by realistic visual content.
+
+Occlusion augmentation helps the model learn that:
+
+- the same identity should remain close in embedding space even when partially hidden
+- the model should not rely only on one visible body/object part
+- the embedding should remain stable under partial occlusion
+- background or blocking regions should not dominate the identity representation
+
+The training pipeline can include these occluded crops using:
+
+```text
+include_occlusion_crops = True
+```
+
+Occlusion is especially important for the MTMC task because cross-camera tracking often contains crowded scenes and imperfect detections.
+
+
+
+## Failure Analysis
+
+Failure analysis is used to understand where the ReID and clustering pipeline makes mistakes.  
+The goal is not only to report final accuracy, but also to identify the main reasons for failure.
+
+The validation pipeline saves diagnostic files for:
+
+| File | Purpose |
+|---|---|
+| `misclustered_points.csv` | Samples assigned to the wrong cluster |
+| `noise_points.csv` | Samples marked as noise by DBSCAN/HDBSCAN |
+| `merge_errors.csv` | Clusters that contain more than one real identity |
+| `fragmentation_errors.csv` | Real identities split across multiple clusters |
+| `embedding_metadata_with_cluster_diagnosis.csv` | Metadata with cluster and failure labels |
+| `interactive_3d_miscluster_diagnosis.html` | Interactive 3D visualization of clustering errors |
+
+
+
+### Noise Samples
+
+Noise samples are tracklets that the clustering algorithm does not assign to any cluster.
+
+This can happen when:
+
+- the crop is heavily occluded
+- the object is very small
+- the tracklet has poor visual quality
+- the embedding is far from other same-identity embeddings
+- the identity appears only weakly across cameras
+
+A high noise rate means the method is conservative.  
+It avoids wrong matches, but it also leaves many samples unassigned.
+
+
+
+### Merge Errors
+
+A merge error happens when one predicted cluster contains multiple real identities.
+
+Example:
+
+```text
+Predicted Cluster 12
+├── Real ID 4
+├── Real ID 4
+├── Real ID 9
+└── Real ID 9
+```
+
+This is dangerous for multi-camera tracking because it means different identities are incorrectly linked together.
+
+Merge errors usually happen when:
+
+- two identities look visually similar
+- occlusion hides important identity features
+- the clustering threshold is too loose
+- HDBSCAN groups nearby identities into the same cluster
+- embeddings are not separated enough
+
+For the final result, DBSCAN was preferred over HDBSCAN because DBSCAN had fewer merge errors.
+
+
+
+### Fragmentation Errors
+
+A fragmentation error happens when one real identity is split into multiple predicted clusters.
+
+Example:
+
+```text
+Real ID 7
+├── Predicted Cluster 3
+├── Predicted Cluster 18
+└── Predicted Cluster 29
+```
+
+This means the system fails to connect all appearances of the same identity.
+
+Fragmentation can happen because:
+
+- the same identity looks different across cameras
+- some crops are occluded
+- lighting or viewpoint changes are large
+- the clustering threshold is too strict
+- some tracklets are marked as noise
+
+Fragmentation is less dangerous than merge errors, but it reduces tracking continuity.
+
+
+
+### Misclustered Samples
+
+A misclustered sample is a sample assigned to a cluster where the dominant identity is not its real identity.
+
+This means the sample was assigned, but assigned incorrectly.
+
+Misclustered samples are especially important because they represent wrong identity associations.  
+In this project, wrong associations are considered worse than leaving a sample as noise.
+
+
+
+### Occlusion Failure Analysis
+
+The pipeline also checks whether failures are mainly caused by clean or occluded samples.
+
+Important metrics include:
+
+| Metric | Meaning |
+|---|---|
+| `clean_noise_rate` | Clean samples marked as noise |
+| `occluded_noise_rate` | Occluded samples marked as noise |
+| `clean_miscluster_rate` | Clean samples assigned to wrong clusters |
+| `occluded_miscluster_rate` | Occluded samples assigned to wrong clusters |
+
+For the final DINOv2 + DBSCAN result, clean samples had no misclustered samples, while most wrong assignments came from occluded samples.  
+This shows that occlusion remains one of the main remaining challenges.
+
+
+
+### DBSCAN vs HDBSCAN Failure Behavior
+
+| Method | Strength | Weakness |
+|---|---|---|
+| DBSCAN | Safer, fewer identity merges | More noise samples |
+| HDBSCAN | More assigned predictions, lower noise | More identity merge errors |
+
+Final decision:
+
+```text
+DINOv2 + DBSCAN eps = 0.045
+```
+
+was selected as the safest final method because it gives the best balance between correct predictions, cluster purity, pair F1, and merge errors.
+
+HDBSCAN is still useful as a high-coverage comparison because it assigns more samples, but it is less safe when avoiding wrong identity merges is the priority.
 
 ## Final Results
 
@@ -721,7 +1023,7 @@ python -u -m script.con_v1_0.val_experiment \
 | OSNet-AIN | 0.8819 | 0.7455 | 0.1364 | 0.8564 |
 | **DINOv2 ReID** | **0.8863** | **0.0222** | **0.8641** | **0.9921** |
 
----
+
 
 ## DBSCAN Results
 
@@ -732,7 +1034,7 @@ python -u -m script.con_v1_0.val_experiment \
 | OSNet-AIN coverage | 0.025 | 147 | 60.57% | 5.35% | 516 / 1514 | 86.43% | 65.45% | 17.01% | 47.27% |
 | **DINOv2 final** | **0.045** | 128 | 18.36% | 9.64% | **1090 / 1514** | 88.19% | **82.92%** | 10.16% | **11.45%** |
 
----
+
 
 ## HDBSCAN Results
 
@@ -745,7 +1047,7 @@ python -u -m script.con_v1_0.val_experiment \
 | OSNet-AIN | 5 | 82 | 43.33% | 14.33% | 641 / 1514 | 74.71% | 62.26% | 36.59% | 17.95% |
 | OSNet-AIN | 10 | 2 | 6.01% | 91.88% | 32 / 1514 | 2.25% | 1.54% | 100.00% | 3.85% |
 
----
+
 
 ## Final Comparison
 
@@ -757,7 +1059,7 @@ python -u -m script.con_v1_0.val_experiment \
 | **DINOv2 + DBSCAN** | **eps=0.045** | **92.47%** | **85.53%** | 18.36% | **9.64%** | 1090 / 1514 | **88.19%** | **82.92%** | **10.16%** | **Best safe final** |
 | **DINOv2 + HDBSCAN** | **MCS=3** | **92.47%** | **85.53%** | **6.67%** | 11.89% | **1233 / 1514** | 87.26% | 82.14% | 17.39% | **Most predictions** |
 
----
+
 
 ## Final Decision
 
@@ -784,7 +1086,7 @@ DINOv2 ReID + HDBSCAN min_cluster_size = 3
 
 HDBSCAN gives more correct assigned predictions, but DBSCAN is safer because it produces fewer identity merge errors.
 
----
+
 
 ## Output Files
 
@@ -815,7 +1117,7 @@ interactive_3d_by_real_identity.html
 interactive_3d_miscluster_diagnosis.html
 ```
 
----
+
 
 ## Installation
 
@@ -847,7 +1149,7 @@ PyYAML
 plotly
 ```
 
----
+
 
 ## Notes
 
