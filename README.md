@@ -14,6 +14,7 @@ The project focuses on:
 - Failure analysis for noise, fragmentation, and identity merges
 
 
+
 ## Project Motivation
 
 Multi-camera tracking requires matching the same object/person across different cameras.  
@@ -27,6 +28,7 @@ This is difficult because of:
 - noisy detections and tracklets
 
 This project improves the feature representation stage by training and evaluating a DINOv2-based ReID model and comparing it with OSNet baselines.
+
 
 
 ## Main Contributions
@@ -61,6 +63,7 @@ This project improves the feature representation stage by training and evaluatin
    - 3D PCA/Plotly visualizations
    - cluster diagnosis plots
    - real identity vs predicted cluster visualizations
+
 
 
 ## Repository Structure
@@ -134,6 +137,7 @@ project-root/
 ```
 
 
+
 ## Pipeline Overview
 
 ```text
@@ -165,6 +169,7 @@ Failure analysis and visualization
 ```
 
 
+
 ## Datasets Used
 
 The experiments use the preprocessed MTMC dataset stored under:
@@ -174,6 +179,7 @@ DataSet/MTMC_Tracking_2025_Preprocessed/
 ```
 
 The dataset is organized into `train` and `val` splits. Each scene contains a `metadata.csv` file and extracted 2D crop images.
+
 
 
 ### Training Dataset
@@ -216,6 +222,7 @@ The model was trained for **12 total epochs**:
 | Stage 2 | 2 | Last two DINOv2 blocks unfrozen |
 
 
+
 ### Validation Dataset
 
 The final validation experiments were performed on the **validation split**:
@@ -246,6 +253,7 @@ Final validation summary:
 
 The validation pipeline first extracts crop-level embeddings, then aggregates them into tracklet-level embeddings.  
 The final reported results are based on these **1,514 tracklet embeddings**.
+
 
 
 ### Dataset Role in the Pipeline
@@ -312,6 +320,7 @@ aggregation = mean_topk
 This means that multiple crop embeddings belonging to the same identity-camera tracklet are combined into one representative tracklet embedding.
 
 
+
 ## Occlusion Handling
 
 Occlusion is a major challenge in multi-camera ReID because the same identity may appear partially hidden, truncated, or visually incomplete in some cameras.  
@@ -369,6 +378,7 @@ The validation pipeline reports separate failure statistics for clean and occlud
 These metrics help identify whether clustering errors are mainly caused by occlusion.
 
 In the final DINOv2 DBSCAN result, clean samples had no misclustered samples, while most wrong assignments came from occluded samples. This shows that occlusion is one of the main remaining failure cases.
+
 
 
 ## Preprocessing and Occlusion Summary
@@ -439,6 +449,7 @@ Classifier
 The model outputs embeddings used for both classification and metric learning.
 
 
+
 ## Paper Baselines
 
 Two OSNet baselines are used for comparison.
@@ -460,6 +471,7 @@ The valid OSNet-AIN experiment used:
 model_name = osnet_ain_x1_0
 checkpoint = osnet_ain_ms_m_c.pth.tar
 ```
+
 
 
 ## Training Losses
@@ -490,6 +502,7 @@ total_loss =
   + contrastive_weight * SupCon
   + occlusion_consistency_weight * OcclusionConsistency
 ```
+
 
 
 ## Training
@@ -560,6 +573,7 @@ sbatch full_experiment_dev_gpu.sh
 ```
 
 
+
 ## Validation and Diagnostics
 
 Main validation script:
@@ -578,6 +592,7 @@ The validation pipeline performs:
 6. DBSCAN or HDBSCAN clustering
 7. cluster failure analysis
 8. 2D and 3D visualization export
+
 
 
 ## DBSCAN Evaluation
@@ -614,6 +629,7 @@ python -u -m script.con_v1_0.val_experiment \
 ```
 
 
+
 ## HDBSCAN Evaluation
 
 Final DINOv2 HDBSCAN command:
@@ -646,6 +662,7 @@ python -u -m script.con_v1_0.val_experiment \
   --reduce_3d_method pca \
   --max_plot_points 50000
 ```
+
 
 
 ## Evaluation Metrics
@@ -683,6 +700,7 @@ python -u -m script.con_v1_0.val_experiment \
 | ARI | Adjusted Rand Index |
 | NMI | Normalized Mutual Information |
 | Silhouette cosine | Cluster separation score using cosine distance |
+
 
 
 ## Multiple Queries per Identity
@@ -728,6 +746,7 @@ Final evaluation setup:
 | Embedding dimension | 512 |
 
 The purpose of multiple queries per identity is to test whether the model can retrieve the same identity under different camera conditions.
+
 
 
 ## Inference Explanation
@@ -801,6 +820,7 @@ The highest-ranked gallery tracklets are considered the most likely matches.
 This is why Rank-1, Rank-5, Rank-10, Rank-20, and mAP are used as retrieval metrics.
 
 
+
 ## Occlusion Augmentation
 
 Occlusion is added during training to make the ReID model more robust to real-world partial visibility.  
@@ -848,6 +868,7 @@ include_occlusion_crops = True
 Occlusion is especially important for the MTMC task because cross-camera tracking often contains crowded scenes and imperfect detections.
 
 
+
 ## Failure Analysis
 
 Failure analysis is used to understand where the ReID and clustering pipeline makes mistakes.  
@@ -865,6 +886,7 @@ The validation pipeline saves diagnostic files for:
 | `interactive_3d_miscluster_diagnosis.html` | Interactive 3D visualization of clustering errors |
 
 
+
 ### Noise Samples
 
 Noise samples are tracklets that the clustering algorithm does not assign to any cluster.
@@ -879,6 +901,7 @@ This can happen when:
 
 A high noise rate means the method is conservative.  
 It avoids wrong matches, but it also leaves many samples unassigned.
+
 
 
 ### Merge Errors
@@ -908,6 +931,7 @@ Merge errors usually happen when:
 For the final result, DBSCAN was preferred over HDBSCAN because DBSCAN had fewer merge errors.
 
 
+
 ### Fragmentation Errors
 
 A fragmentation error happens when one real identity is split into multiple predicted clusters.
@@ -934,6 +958,7 @@ Fragmentation can happen because:
 Fragmentation is less dangerous than merge errors, but it reduces tracking continuity.
 
 
+
 ### Misclustered Samples
 
 A misclustered sample is a sample assigned to a cluster where the dominant identity is not its real identity.
@@ -942,6 +967,7 @@ This means the sample was assigned, but assigned incorrectly.
 
 Misclustered samples are especially important because they represent wrong identity associations.  
 In this project, wrong associations are considered worse than leaving a sample as noise.
+
 
 
 ### Occlusion Failure Analysis
@@ -959,6 +985,7 @@ Important metrics include:
 
 For the final DINOv2 + DBSCAN result, clean samples had no misclustered samples, while most wrong assignments came from occluded samples.  
 This shows that occlusion remains one of the main remaining challenges.
+
 
 
 ### DBSCAN vs HDBSCAN Failure Behavior
@@ -984,6 +1011,7 @@ The following values were collected from the committed GitHub validation outputs
 The values come from each run's `metrics.json` file, specifically from the `cluster_failure` block.
 
 
+
 ### Source Output Files
 
 | Run | GitHub output path |
@@ -993,6 +1021,7 @@ The values come from each run's `metrics.json` file, specifically from the `clus
 | OSNet-x1.0 + DBSCAN | `output/output_dbscan/output_paper/20260622_185216/metrics.json` |
 | OSNet-AIN + DBSCAN strict | `output/output_dbscan/output_paper/final_paper_text_osnet_ain_val_tracklet_20260629_001735/metrics.json` |
 | OSNet-AIN + HDBSCAN | `output/output_hdbscan/output_paper/hdbscan_osnet_ain_mcs3_20260701_180958/metrics.json` |
+
 
 
 ### General Failure Analysis Values
@@ -1006,6 +1035,7 @@ The values come from each run's `metrics.json` file, specifically from the `clus
 | OSNet-AIN + HDBSCAN | MCS=3 | 629 | 41.55% | 158 | 10.44% | 41 | 33.88% | 50 | 40.00% |
 
 
+
 ### Occlusion-Aware Failure Values
 
 | Model / Method | Setting | Clean Noise Rate | Occluded Noise Rate | Clean Miscluster Rate | Occluded Miscluster Rate |
@@ -1015,6 +1045,7 @@ The values come from each run's `metrics.json` file, specifically from the `clus
 | DINOv2 + DBSCAN final | eps=0.045 | 73.68% | 15.44% | 0.00% | 10.15% |
 | DINOv2 + HDBSCAN | MCS=3 | 27.63% | 5.56% | 3.95% | 12.31% |
 | OSNet-AIN + HDBSCAN | MCS=3 | 72.37% | 39.92% | 13.16% | 10.29% |
+
 
 
 ### Final DINOv2 DBSCAN Failure Analysis
@@ -1051,6 +1082,7 @@ Interpretation:
 - HDBSCAN gives more assigned predictions, but it increases merge errors.
 
 
+
 ### DBSCAN vs HDBSCAN Failure Trade-Off
 
 | Final DINOv2 Method | Noise Rate | Miscluster Rate | Merge Error Rate | Fragmentation Rate | Main Advantage | Main Weakness |
@@ -1085,6 +1117,7 @@ Report DINOv2 + HDBSCAN MCS=3 as a high-coverage comparison.
 | **DINOv2 ReID** | **0.8863** | **0.0222** | **0.8641** | **0.9921** |
 
 
+
 ## DBSCAN Results
 
 | Model | eps | Clusters | Noise Rate | Miscluster Rate | Correct Assigned | Cluster Purity | Pair F1 | Merge Error | Fragmentation |
@@ -1093,6 +1126,7 @@ Report DINOv2 + HDBSCAN MCS=3 as a high-coverage comparison.
 | OSNet-AIN strict | 0.015 | 77 | 87.32% | **0.26%** | 188 / 1514 | **97.92%** | 76.52% | **5.19%** | 27.42% |
 | OSNet-AIN coverage | 0.025 | 147 | 60.57% | 5.35% | 516 / 1514 | 86.43% | 65.45% | 17.01% | 47.27% |
 | **DINOv2 final** | **0.045** | 128 | 18.36% | 9.64% | **1090 / 1514** | 88.19% | **82.92%** | 10.16% | **11.45%** |
+
 
 
 ## HDBSCAN Results
@@ -1107,6 +1141,7 @@ Report DINOv2 + HDBSCAN MCS=3 as a high-coverage comparison.
 | OSNet-AIN | 10 | 2 | 6.01% | 91.88% | 32 / 1514 | 2.25% | 1.54% | 100.00% | 3.85% |
 
 
+
 ## Final Comparison
 
 | Model / Method | Setting | Rank-1 | mAP | Noise Rate | Miscluster Rate | Correct Assigned | Cluster Purity | Pair F1 | Merge Error | Final Use |
@@ -1116,6 +1151,7 @@ Report DINOv2 + HDBSCAN MCS=3 as a high-coverage comparison.
 | OSNet-AIN + HDBSCAN | MCS=3 | 77.28% | 52.23% | 41.55% | 10.44% | 727 / 1514 | 82.15% | 73.29% | 33.88% | Best OSNet-AIN coverage |
 | **DINOv2 + DBSCAN** | **eps=0.045** | **92.47%** | **85.53%** | 18.36% | **9.64%** | 1090 / 1514 | **88.19%** | **82.92%** | **10.16%** | **Best safe final** |
 | **DINOv2 + HDBSCAN** | **MCS=3** | **92.47%** | **85.53%** | **6.67%** | 11.89% | **1233 / 1514** | 87.26% | 82.14% | 17.39% | **Most predictions** |
+
 
 
 ## Final Decision
@@ -1142,6 +1178,7 @@ DINOv2 ReID + HDBSCAN min_cluster_size = 3
 ```
 
 HDBSCAN gives more correct assigned predictions, but DBSCAN is safer because it produces fewer identity merge errors.
+
 
 
 ## Output Files
@@ -1174,6 +1211,7 @@ interactive_3d_miscluster_diagnosis.html
 ```
 
 
+
 ## Installation
 
 Create and activate an environment:
@@ -1203,6 +1241,7 @@ hdbscan
 PyYAML
 plotly
 ```
+
 
 
 ## Notes
