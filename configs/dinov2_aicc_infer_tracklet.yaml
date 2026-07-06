@@ -1,28 +1,32 @@
 model:
   backbone: dinov2
+  model_name: dinov2_vitb14 # dinov2_vits14, dinov2_vitb14, or dinov2_vitl14
   lora_rank: 16
   use_lora: false
   osnet_weights: null
-  feature_mode: cls
+  feature_mode: cls_patchavg
 
 checkpoint:
   path: /mnt/nfs/home/st201745/checkpoints/best_model.pth
-  use_pretrained: true
+  use_pretrained: false
 
 data:
   query: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_query.csv
   gallery: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_gallery.csv
+  query_embeddings_path: /mnt/nfs/home/st201745/cache/dinov2_aicc_tracklet_query_embeddings.pt
+  gallery_embeddings_path: /mnt/nfs/home/st201745/cache/dinov2_aicc_tracklet_gallery_embeddings.pt
+  
   num_workers: 4
   # Pool per-image embeddings into one descriptor per tracklet.
   # Options: "mean" | "max" | null (image-level, no pooling)
-  # "mean" | "max" |"dbscan"| "weighted" |"medoid" |"gem"
-  tracklet_pool: dbscan
+  # "mean" | "max" |"dbscan"| "weighted" |"medoid" |"gem" | "hdbscan"
+  tracklet_pool: gem
 
 eval:
-  batch_size: 64
+  batch_size: 64  # 512
 
 rerank:
-  enabled: false
+  enabled: true
   k1: 20
   k2: 6
   lambda: 0.3

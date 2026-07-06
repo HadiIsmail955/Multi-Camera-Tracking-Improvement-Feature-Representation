@@ -1,8 +1,9 @@
 model:
-  backbone: osnet
+  backbone: osnet_ain
   lora_rank: 16
   use_lora: false   # set to false for full fine-tuning
-  osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+  # osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+  osnet_weights: /mnt/nfs/home/st201745/weights/osnet_ain_ms_m_c.pth.tar
   feature_mode: cls
 
 checkpoint:

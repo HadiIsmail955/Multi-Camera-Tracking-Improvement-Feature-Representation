@@ -5,7 +5,8 @@ model:
   lora_rank: 32
   use_lora: false   # set to false for full fine-tuning
   osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
-
+  # osnet_weights: /mnt/nfs/home/st201745/weights/osnet_ain_ms_m_c.pth.tar
+  
 data:
   train: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_train.csv
   query: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_query.csv
@@ -19,7 +20,7 @@ sampler:
 optim:
   epochs: 300
   warmup: 10
-  lr: 0.001
+  lr: 0.003
   ce_weight: 1.0
   label_smoothing: 0.1
   triplet_weight: 1.0
@@ -29,7 +30,7 @@ optim:
   max_grad_norm: 1.0
 
 eval:
-  interval: 100
+  interval: 50
   batch_size: 64
 
 output:

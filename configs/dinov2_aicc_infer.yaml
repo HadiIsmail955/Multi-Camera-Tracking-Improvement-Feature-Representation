@@ -1,13 +1,14 @@
 model:
   backbone: dinov2
+  model_name: dinov2_vitb14
   lora_rank: 16
   use_lora: false   # set to false for full fine-tuning
   osnet_weights: null
-  feature_mode: cls
+  feature_mode: cls_patchavg
 
 checkpoint:
   path: /mnt/nfs/home/st201745/checkpoints/best_model.pth
-  use_pretrained: true
+  use_pretrained: false
 
 data:
   query: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_query.csv
@@ -15,7 +16,7 @@ data:
   num_workers: 4
 
 eval:
-  batch_size: 256
+  batch_size: 512
 
 rerank:
   enabled: false

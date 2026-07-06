@@ -1,17 +1,20 @@
 model:
   backbone: dinov2
+  model_name: dinov2_vitb14
   feature_mode: cls_patchavg
   lora_rank: 16
   use_lora: false   # set to false for full fine-tuning
   osnet_weights: null
 
 checkpoint:
-  path: checkpoints/best_model.pth
+  path: /mnt/nfs/home/st201745/checkpoints/best_model.pth
   use_pretrained: false
 
 data:
   query: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/query_records.csv
   gallery: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/gallery_records.csv
+  query_embeddings_path: /mnt/nfs/home/st201745/cache/dinov2_market_query_embeddings.pt
+  gallery_embeddings_path: /mnt/nfs/home/st201745/cache/dinov2_market_gallery_embeddings.pt
   num_workers: 4
 
 eval:
@@ -24,5 +27,5 @@ rerank:
   lambda: 0.3
 
 output:
-  distance_matrix: distance_matrix.pt
-  matching_results: matching_results.csv
+  distance_matrix: /mnt/nfs/home/st201745/checkpoints/distance_matrix.pt
+  matching_results: /mnt/nfs/home/st201745/checkpoints/matching_results.csv

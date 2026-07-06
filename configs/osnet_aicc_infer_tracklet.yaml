@@ -2,16 +2,20 @@ model:
   backbone: osnet
   lora_rank: 16
   use_lora: false
-  osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
-  feature_mode: cls_patchavg
+  # osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
+  osnet_weights: /mnt/nfs/home/st201745/weights/osnet_ain_ms_m_c.pth.tar
+  feature_mode: cls
 
 checkpoint:
   path: /mnt/nfs/home/st201745/checkpoints/best_model.pth
-  use_pretrained: true
+  use_pretrained: false
 
 data:
   query: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_query.csv
   gallery: /mnt/nfs/home/st201745/aicity_preprocessed/manifests/image_gallery.csv
+  query_embeddings_path: /mnt/nfs/home/st201745/cache/dinov2_aicc_tracklet_query_embeddings.pt
+  gallery_embeddings_path: /mnt/nfs/home/st201745/cache/dinov2_aicc_tracklet_gallery_embeddings.pt
+
   num_workers: 4
   # Pool per-image embeddings into one descriptor per tracklet.
   # Options: "mean" | "max" | null (image-level, no pooling)     valid_pools = (
@@ -19,7 +23,7 @@ data:
   tracklet_pool: dbscan
 
 eval:
-  batch_size: 64
+  batch_size: 256
 
 rerank:
   enabled: false

@@ -1,5 +1,6 @@
 model:
   backbone: dinov2 # dinov2 or osnet
+  model_name: dinov2_vitb14
   feature_mode: cls_patchavg # cls or cls_patchavg
   pretrained: true
   lora_rank: 16
@@ -7,9 +8,9 @@ model:
   osnet_weights: /mnt/nfs/home/st201745/weights/osnet_x1_0_market_256x128_amsgrad_ep150_stp60_lr0.0015_b64_fb10_softmax_labelsmooth_flip.pth
 
 data:
-  train: data_csv/train_records.csv
-  query: data_csv/query_records.csv
-  gallery: data_csv/gallery_records.csv
+  train: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/train_records.csv
+  query: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/query_records.csv
+  gallery: /mnt/nfs/home/st201745/Multi-Camera-Tracking-Improvement-Feature-Representation/data_csv/gallery_records.csv
   num_workers: 4
 
 sampler:
@@ -17,15 +18,17 @@ sampler:
   K: 4
 
 optim:
-  epochs: 100
+  epochs: 300
   warmup: 10
   lr: 0.001
-  ce_weight: 0.0
+  ce_weight: 1.0
   label_smoothing: 0.1
   triplet_weight: 1.0
   margin: 0.3
   arcface_weight: 1.0
   supcon_weight: 1.0
+  occlusion_weight: 0.0
+  occlusion_feature_drop_prob: 0.25
   max_grad_norm: 1.0
 
 eval:
@@ -33,5 +36,5 @@ eval:
   batch_size: 64
 
 output:
-  checkpoint_dir: checkpoints
-  log_path: checkpoints/training_log.csv
+  checkpoint_dir: /mnt/nfs/home/st201745/checkpoints
+  log_path: /mnt/nfs/home/st201745/checkpoints/training_log.csv

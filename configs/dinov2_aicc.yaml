@@ -1,6 +1,7 @@
 model:
   backbone: dinov2
-  feature_mode: cls
+  model_name: dinov2_vitb14
+  feature_mode: cls_patchavg
   pretrained: true
   lora_rank: 16
   use_lora: false   # set to false for full fine-tuning
@@ -25,7 +26,9 @@ optim:
   triplet_weight: 1.0
   margin: 0.3
   arcface_weight: 1.0
-  supcon_weight: 0.0
+  supcon_weight: 1.0
+  occlusion_weight: 0.0
+  occlusion_feature_drop_prob: 0.25
   max_grad_norm: 1.0
 
 eval:
