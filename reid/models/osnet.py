@@ -19,6 +19,7 @@ class OSNetBaseline(nn.Module):
         num_classes: int,
         pretrained: bool = True,
         weight_path: str | None = None,
+        model_name: str = "osnet_x1_0",
     ):
         super().__init__()
 
@@ -31,7 +32,7 @@ class OSNetBaseline(nn.Module):
             ) from exc
 
         self.backbone = torchreid.models.build_model(
-            name="osnet_x1_0",
+            name=model_name,
             num_classes=num_classes,
             pretrained=pretrained,
         )

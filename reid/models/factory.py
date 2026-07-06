@@ -14,12 +14,16 @@ def build_model(
     dino_feature_mode: str = "cls",
     dino_model_name: str = "dinov2_vitb14",
 ) -> nn.Module:
-    if backbone == "osnet":
-        print(f"\nBuilding OSNet baseline  (num_classes={num_classes})")
+    if backbone in ["osnet", "osnet_ain"]:
+        print(f"\nBuilding {backbone.upper()} baseline  (num_classes={num_classes})")
+        
+        torchreid_name = "osnet_ain_x1_0" if backbone == "osnet_ain" else "osnet_x1_0"
+        
         return OSNetBaseline(
             num_classes=num_classes,
             pretrained=(osnet_weight_path is None),
             weight_path=osnet_weight_path,
+            model_name=torchreid_name  
         )
 
     if backbone == "dinov3":
