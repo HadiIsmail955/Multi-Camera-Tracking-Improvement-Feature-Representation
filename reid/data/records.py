@@ -7,6 +7,7 @@ class Record:
     filepath: str
     pid: int
     camid: int
+    tracklet_id: str = ""
 
 
 def load_records(csv_path: str) -> list[Record]:
@@ -19,6 +20,7 @@ def load_records(csv_path: str) -> list[Record]:
                     filepath=row["filepath"],
                     pid=int(row["pid"]),
                     camid=int(row["camid"]),
+                    tracklet_id=row.get("tracklet_id", ""),
                 )
             )
 

@@ -1,5 +1,6 @@
 import argparse
 import csv
+from pathlib import Path
 
 import torch
 
@@ -9,11 +10,14 @@ from reid.data.loaders import build_eval_loader
 from reid.engine import extract_embeddings, pool_tracklet_embeddings, read_tracklet_ids
 from reid.engine.checkpoint import load_checkpoint
 from reid.evaluation import (
+    cosine_similarity_matrix,
     cosine_distance_matrix,
     k_reciprocal_rerank,
     rank_gallery_indices,
     ranked_indices_to_pids,
     compute_rank1_map,
+    compute_embedding_metrics,
+    export_retrieval_examples,
 )
 from reid.models import build_model
 
@@ -246,6 +250,9 @@ def main(config: dict):
 
     # Tracklet pooling
     tracklet_pool = data_cfg.get("tracklet_pool", None)  # "mean" | "max" | None
+    q_noise, g_noise = None, None
+    q_tids, g_tids = None, None
+
     if tracklet_pool:
         q_tracklet_ids = read_tracklet_ids(data_cfg["query"])
         g_tracklet_ids = read_tracklet_ids(data_cfg["gallery"])
@@ -253,19 +260,21 @@ def main(config: dict):
         if not q_tracklet_ids[0]:
             print("  [WARNING] query CSV has no tracklet_id column; skipping pooling.")
         else:
-            q_embs, q_pids, q_camids, q_tids = pool_tracklet_embeddings(
+            q_embs, q_pids, q_camids, q_tids, q_noise = pool_tracklet_embeddings(
                 q_embs,
                 q_pids,
                 q_camids,
                 q_tracklet_ids,
                 pool=tracklet_pool,
+                return_noise_info=True,
             )
-            g_embs, g_pids, g_camids, g_tids = pool_tracklet_embeddings(
+            g_embs, g_pids, g_camids, g_tids, g_noise = pool_tracklet_embeddings(
                 g_embs,
                 g_pids,
                 g_camids,
                 g_tracklet_ids,
                 pool=tracklet_pool,
+                return_noise_info=True,
             )
             print(
                 f"  Tracklet pooling ({tracklet_pool}): "
@@ -290,11 +299,13 @@ def main(config: dict):
             k2=rerank_cfg["k2"],
             lam=rerank_cfg["lambda"],
         )
+        sim_matrix = cosine_similarity_matrix(q_embs, g_embs)
     else:
         dist_matrix = cosine_distance_matrix(
             q_embs=q_embs,
             g_embs=g_embs,
         )
+        sim_matrix = 1.0 - dist_matrix
 
     print(
         f"  Distance matrix : {list(dist_matrix.shape)}  "
@@ -319,6 +330,23 @@ def main(config: dict):
         g_camids=g_camids,
     )
 
+    noise_info = None
+    if q_noise or g_noise:
+        noise_info = {
+            "noise_samples": (q_noise["noise_samples"] if q_noise else []) + (g_noise["noise_samples"] if g_noise else []),
+            "total_frames": (q_noise["total_frames"] if q_noise else []) + (g_noise["total_frames"] if g_noise else []),
+            "noise_rates": (q_noise["noise_rates"] if q_noise else []) + (g_noise["noise_rates"] if g_noise else []),
+        }
+
+    analysis_metrics = compute_embedding_metrics(
+        sim_matrix=sim_matrix,
+        q_pids=q_pids,
+        q_camids=q_camids,
+        g_pids=g_pids,
+        g_camids=g_camids,
+        noise_info=noise_info,
+    )
+
     ranked_pids = ranked_indices_to_pids(
         ranked_indices=ranked_indices,
         g_pids=g_pids,
@@ -338,6 +366,32 @@ def main(config: dict):
     print(f"  mAP    : {mAP:.4f}  ({mAP * 100:.2f}%)")
     print("  ──────────────────────────────────────────")
 
+    same_id = analysis_metrics["same_id"]
+    diff_id = analysis_metrics["diff_id"]
+    print("\n  ── Embedding Quality Analysis ───────────")
+    print(
+        f"  Same-ID Cosine Sim : mean={same_id['mean']:.4f}  "
+        f"std={same_id['std']:.4f}  "
+        f"pairs={same_id['count']:,}"
+    )
+    print(
+        f"  Diff-ID Cosine Sim : mean={diff_id['mean']:.4f}  "
+        f"std={diff_id['std']:.4f}  "
+        f"pairs={diff_id['count']:,}"
+    )
+    print(f"  Separation Gap     : {analysis_metrics['separation_gap']:.4f}")
+    print(f"  Pair ROC-AUC       : {analysis_metrics['roc_auc']:.4f}")
+
+    noise_stats = analysis_metrics.get("noise_stats")
+    if noise_stats:
+        print("\n  ── DBSCAN / HDBSCAN Noise Analysis ──────")
+        print(f"  Avg Noise Samples  : {noise_stats['avg_noise_samples']:.2f}")
+        print(f"  Avg Noise Rate     : {noise_stats['avg_noise_rate'] * 100:.2f}%")
+        print(f"  Median Noise Rate  : {noise_stats['median_noise_rate'] * 100:.2f}%")
+        print(f"  Max Noise Rate     : {noise_stats['max_noise_rate'] * 100:.2f}%")
+
+    print("  ──────────────────────────────────────────")
+
     torch.save(
         {
             "dist_matrix": dist_matrix,
@@ -347,6 +401,7 @@ def main(config: dict):
             "g_camids": g_camids,
             "reranked": rerank_cfg.get("enabled", False),
             "mode": mode,
+            "analysis": analysis_metrics,
         },
         output_cfg["distance_matrix"],
     )
@@ -358,8 +413,33 @@ def main(config: dict):
         q_camids=q_camids,
     )
 
+    output_dir = Path(output_cfg["matching_results"]).parent
+    retrieval_csv_path = output_cfg.get(
+        "retrieval_examples", str(output_dir / "retrieval_examples.csv")
+    )
+    correct_top5_csv_path = output_cfg.get(
+        "correct_top5", str(output_dir / "correct_top5.csv")
+    )
+
+    export_retrieval_examples(
+        output_csv_path=retrieval_csv_path,
+        correct_top5_csv_path=correct_top5_csv_path,
+        dist_matrix=dist_matrix,
+        ranked_indices=ranked_indices,
+        q_pids=q_pids,
+        q_camids=q_camids,
+        g_pids=g_pids,
+        g_camids=g_camids,
+        query_records=query_records,
+        gallery_records=gallery_records,
+        q_tids=q_tids if tracklet_pool else None,
+        g_tids=g_tids if tracklet_pool else None,
+    )
+
     print(f"\n  Saved: {output_cfg['distance_matrix']}")
     print(f"  Saved: {output_cfg['matching_results']}")
+    print(f"  Saved: {retrieval_csv_path}")
+    print(f"  Saved: {correct_top5_csv_path}")
 
     pooled_embs_path = output_cfg["distance_matrix"].replace("distance_matrix.pt", "pooled_tracklet_embeddings.pt")
     
@@ -369,7 +449,8 @@ def main(config: dict):
         "q_camids": q_camids,
         "g_embs": g_embs,
         "g_pids": g_pids,
-        "g_camids": g_camids
+        "g_camids": g_camids,
+        "analysis": analysis_metrics,
     }, pooled_embs_path)
     
     print(f"  Saved pooled tracklet embeddings: {pooled_embs_path}")

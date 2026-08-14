@@ -34,3 +34,5 @@ rerank:
 output:
   distance_matrix: /mnt/nfs/home/st201745/checkpoints/distance_matrix.pt
   matching_results: /mnt/nfs/home/st201745/checkpoints/matching_results.csv
+  retrieval_examples: /mnt/nfs/home/st201745/checkpoints/retrieval_examples.csv
+  correct_top5: /mnt/nfs/home/st201745/checkpoints/correct_top5.csv

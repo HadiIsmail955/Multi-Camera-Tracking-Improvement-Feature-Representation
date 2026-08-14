@@ -11,6 +11,8 @@ from reid.evaluation.ranking import (
     ranked_indices_to_pids,
 )
 from reid.evaluation.rerank import k_reciprocal_rerank
+from reid.evaluation.analysis import compute_embedding_metrics
+from reid.evaluation.export import export_retrieval_examples, format_crop_path
 
 __all__ = [
     "cosine_similarity_matrix",
@@ -20,4 +22,7 @@ __all__ = [
     "rank_gallery_indices",
     "ranked_indices_to_pids",
     "k_reciprocal_rerank",
+    "compute_embedding_metrics",
+    "export_retrieval_examples",
+    "format_crop_path",
 ]

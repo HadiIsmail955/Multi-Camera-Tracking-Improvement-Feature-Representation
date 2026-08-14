@@ -189,10 +189,10 @@ def _pool_dbscan(
     group: torch.Tensor,
     dbscan_eps: float,
     dbscan_min_samples: int,
-) -> tuple[torch.Tensor, bool]:
-    """Returns (pooled embedding, did_fallback)."""
+) -> tuple[torch.Tensor, bool, int]:
+    """Returns (pooled embedding, did_fallback, noise_count)."""
     if len(group) < dbscan_min_samples:
-        return group.mean(dim=0), True
+        return group.mean(dim=0), True, len(group)
 
     feats = normalize(group.detach().cpu().numpy(), norm="l2")
     labels = (
@@ -205,23 +205,25 @@ def _pool_dbscan(
         .labels_
     )
 
+    noise_count = int(np.sum(labels == -1))
+
     valid_mask = labels >= 0
     if not np.any(valid_mask):
-        return group.mean(dim=0), True
+        return group.mean(dim=0), True, noise_count
 
     unique_labels, counts = np.unique(labels[valid_mask], return_counts=True)
     largest_cluster = unique_labels[np.argmax(counts)]
-    return group[labels == largest_cluster].mean(dim=0), False
+    return group[labels == largest_cluster].mean(dim=0), False, noise_count
 
 
 def _pool_hdbscan(
     group: torch.Tensor,
     hdbscan_min_cluster_size: int,
     hdbscan_min_samples: int | None,
-) -> tuple[torch.Tensor, bool]:
-
+) -> tuple[torch.Tensor, bool, int]:
+    """Returns (pooled embedding, did_fallback, noise_count)."""
     if len(group) < hdbscan_min_cluster_size:
-        return group.mean(dim=0), True
+        return group.mean(dim=0), True, len(group)
 
     feats = normalize(group.detach().cpu().numpy(), norm="l2")
     labels = (
@@ -234,13 +236,15 @@ def _pool_hdbscan(
         .labels_
     )
 
+    noise_count = int(np.sum(labels == -1))
+
     valid_mask = labels >= 0
     if not np.any(valid_mask):
-        return group.mean(dim=0), True
+        return group.mean(dim=0), True, noise_count
 
     unique_labels, counts = np.unique(labels[valid_mask], return_counts=True)
     largest_cluster = unique_labels[np.argmax(counts)]
-    return group[labels == largest_cluster].mean(dim=0), False
+    return group[labels == largest_cluster].mean(dim=0), False, noise_count
 
 
 def _pool_gem(group: torch.Tensor, gem_p: float = 3.0) -> torch.Tensor:
@@ -266,6 +270,7 @@ def pool_tracklet_embeddings(
     hdbscan_min_samples: int | None = None,
     consensus_k: int = 10,
     weighted_temperature: float = 10.0,
+    return_noise_info: bool = False,
 ):
     """
     Pool per-image embeddings into one descriptor per tracklet.
@@ -297,12 +302,9 @@ def pool_tracklet_embeddings(
             Generalised mean pooling (signed variant).
 
     Returns:
-        (
-            tracklet_embs,
-            tracklet_pids,
-            tracklet_camids,
-            tracklet_ids
-        )
+        (tracklet_embs, tracklet_pids, tracklet_camids, tracklet_ids)
+        or if return_noise_info=True:
+        (tracklet_embs, tracklet_pids, tracklet_camids, tracklet_ids, noise_info)
     """
 
     valid_pools = (
@@ -346,8 +348,13 @@ def pool_tracklet_embeddings(
     num_dbscan_fallbacks = 0
     num_hdbscan_fallbacks = 0
 
+    noise_samples_list: list[int] = []
+    total_frames_list: list[int] = []
+    noise_rates_list: list[float] = []
+
     for tid in order:
         group = embs[indices_by_tracklet[tid]]  # [k, D]
+        n_frames = len(group)
 
         if pool == "mean":
             pooled_embs.append(_pool_mean(group))
@@ -360,17 +367,23 @@ def pool_tracklet_embeddings(
         elif pool == "consensus":
             pooled_embs.append(_pool_consensus(group, consensus_k))
         elif pool == "dbscan":
-            emb, fallback = _pool_dbscan(group, dbscan_eps, dbscan_min_samples)
+            emb, fallback, noise_cnt = _pool_dbscan(group, dbscan_eps, dbscan_min_samples)
             pooled_embs.append(emb)
             if fallback:
                 num_dbscan_fallbacks += 1
+            noise_samples_list.append(noise_cnt)
+            total_frames_list.append(n_frames)
+            noise_rates_list.append(noise_cnt / n_frames if n_frames > 0 else 0.0)
         elif pool == "hdbscan":
-            emb, fallback = _pool_hdbscan(
+            emb, fallback, noise_cnt = _pool_hdbscan(
                 group, hdbscan_min_cluster_size, hdbscan_min_samples
             )
             pooled_embs.append(emb)
             if fallback:
                 num_hdbscan_fallbacks += 1
+            noise_samples_list.append(noise_cnt)
+            total_frames_list.append(n_frames)
+            noise_rates_list.append(noise_cnt / n_frames if n_frames > 0 else 0.0)
         elif pool == "gem":
             pooled_embs.append(_pool_gem(group))
 
@@ -388,6 +401,23 @@ def pool_tracklet_embeddings(
     print(
         f"Pooled from {embs.shape[0]:,} images into {len(order):,} tracklet embeddings"
     )
+
+    noise_info = None
+    if pool in ("dbscan", "hdbscan"):
+        noise_info = {
+            "noise_samples": noise_samples_list,
+            "total_frames": total_frames_list,
+            "noise_rates": noise_rates_list,
+        }
+
+    if return_noise_info:
+        return (
+            torch.stack(pooled_embs),
+            [pid_by_tracklet[t] for t in order],
+            [camid_by_tracklet[t] for t in order],
+            order,
+            noise_info,
+        )
 
     return (
         torch.stack(pooled_embs),
