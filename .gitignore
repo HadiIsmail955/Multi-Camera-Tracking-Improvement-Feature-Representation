@@ -156,6 +156,7 @@ Desktop.ini
 # Project-specific
 checkpoints/
 checkpoints_max/
+plots/
 *.csv
 *.pt
 *.pth

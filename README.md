@@ -1,157 +1,183 @@
-# ReID Training and Inference
+<p align="center">
+  <h1 align="center">Multi-Camera Re-Identification</h1>
+  <h3 align="center">A Modern Bag of Tricks for Multi-Camera Feature Representation</h3>
+</p>
 
-This repository provides a YAML-driven ReID pipeline for:
+<p align="center">
+  <a href="https://www.python.org/downloads/release/python-3110/"><img src="https://img.shields.io/badge/python-3.11-blue.svg" alt="Python 3.11"></a>
+  <a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-2.1+-ee4c2c.svg" alt="PyTorch 2.1+"></a>
+  <a href="https://github.com/facebookresearch/dinov2"><img src="https://img.shields.io/badge/Backbone-DINOv2%20ViT--B%2F14-6f42c1.svg" alt="DINOv2"></a>
+  <img src="https://img.shields.io/badge/Market--1501%20mAP-94.2%25-brightgreen.svg" alt="Market-1501 mAP">
+  <img src="https://img.shields.io/badge/AI%20City%202025%20mAP-91.6%25-brightgreen.svg" alt="AI City 2025 mAP">
+</p>
 
-- Training with `osnet` or `dinov2`
-- Random Erasing Augmentation
-- BNNeck
-- LoRA or full fine-tuning (for DINO backbones)
-- Combined CE + BatchHard Triplet + SupCon losses + ArcFace Loss
-- Inference and cross-camera matching with optional k-reciprocal re-ranking
-- Clustering and pooling methods
-- Patch Average Embeddings + CLS Embeddings
+<!-- omit in toc -->
+<a name="overview"></a>
 
-## Project layout
+## Overview
 
-- `reid/train.py`: training entrypoint
-- `reid/inference.py`: inference / matching entrypoint
-<!-- - `configs/*.yaml`: training and inference configs -->
+This repository presents a feature representation framework for multi-camera object and person re-identification (ReID) based on the self-supervised Vision Transformer **DINOv2** (`dinov2_vitb14`). Combining the global class token with mean-pooled patch tokens captures both semantic context and local appearance, while a **BNNeck**, hybrid metric-learning losses (Label-Smoothed CE, Batch-Hard Triplet, Supervised Contrastive, and ArcFace), and **Random Erasing** produce compact embeddings that remain robust to appearance changes and partial occlusions. For tracklet-level aggregation, **Generalized Mean (GeM) pooling** retains all frame-level features without the limitations of density-based clustering, and **$k$-reciprocal re-ranking** further refines retrieval.
 
-## Datasets
-### AI City / MTMC Tracking 2025
-- Primary dataset for this project.
-- It contains object crops extracted from multi-camera videos.
-- Synthetic dataset includes multiple cameras, scenes, object identities, frames, and object types.
+```
+                            Input Image (384 × 192)
+                                       │
+                                       ▼
+                ┌──────────────────────┬──────────────────────┐
+                │          DINOv2 Backbone (ViT-B/14)         │
+                │  CLS Token (768-D)   │ Patch Tokens (768-D) │
+                └──────────┬───────────┴───────────┬──────────┘
+                           └───────────┬───────────┘
+                                       │
+                                       ▼
+                            Concatenation (1536-D)
+                                       │
+                                       ▼
+                                   1D BNNeck
+                                       │
+                                       ▼
+                               L2-Normalization
+                                       │
+                 ┌─────────────────────┴─────────────────────┐
+                 ▼                                           ▼
+ ┌───────────────────────────────┐           ┌───────────────────────────────┐
+ │      Training Objectives      │           │      Inference & Matching     │
+ ├───────────────────────────────┤           ├───────────────────────────────┤
+ │ • Label-Smoothed CE           │           │ • GeM / DBSCAN Tracklet Pool  │
+ │ • Batch-Hard Triplet Loss     │           │ • Cosine Similarity           │
+ │ • Supervised Contrastive      │           │ • k-Reciprocal Re-Ranking     │
+ │ • ArcFace Loss                │           │ • Embedding Quality Metrics   │
+ └───────────────────────────────┘           └───────────────────────────────┘
+```
 
-### Market-1501
-- A standard person ReID benchmark.
-- Market-1501 is used to validate the methods on a well-established ReID dataset
-- Real dataset, cross-camera, person identities
+---
 
-> **Note**: The test set of Market-1501 dataset comes with a pre-defined query and gallery splits for benchmarking.
-AI City validation query / gallery splits are created following Market-1501 / MSMT protocols (1 query per ID)
+<a name="quick-start"></a>
 
-## MTMC Tracking 2025 Data Preprocessing
-**Motivation:**
-- Using all frames from videos of AI City has millions on images.
-- The validation set of AI City datasets has no query and gallery available
+## Quick Start
 
-### Tracklet Generation
-- Subsample (1 FPS)
-- Split on > 30 frame gaps
-- Discard tracklets with < 2 frames
+Get started with Multi-Camera Re-Identification in a few steps.
 
-### Identity Assignment
-- Generate tracklet with unique tracklet ID
-- Generate global PID for objects and connect with tracklet ID
+### Prerequisites
 
-### Frame Sampling
-- Keeps tracklet if total frames <= 30
-- If > 30, sample 30 evenly spaced frames
+- Linux OS
+- Python `>=3.11, <3.12`
+- NVIDIA GPU with CUDA support (e.g., A100, H100)
 
-For validation dataset,
-- Discard identities that do not appear across at least 2 distinct cameras.
-- For each identity in validation, take the longest tracklet as query.
-- Assign all remaining tracklets of that identity (except those from same camera) to gallery split.
+### Installation & Environment Setup
 
-## Evaluation Strategy
-### Image-Level Evaluation
-- Extract image embeddings of the validation set (query and gallery).
-- Compute distance between query and gallery embeddings.
-- Compute Rank-1 and mAP.
+Clone this repository:
 
-### Tracklet-Level Evaluation
-- Extract image embeddings of the validation set (query and gallery).
-- For each tracklet ID, combine the image embeddings to a tracklet embedding using the post-processing methods.
-- Compute distance between query and gallery tracklet embeddings.
-- Compute Rank-1 and mAP.
+```bash
+git clone https://github.com/HadiIsmail955/Multi-Camera-Tracking-Improvement-Feature-Representation.git
+git checkout main
+cd Multi-Camera-Tracking-Improvement-Feature-Representation
+```
 
-### Evaluation Protocol
-- Positive: same Person ID + diﬀerent Camera ID
-- Junk: same Person ID + same CameraID
+This repository uses [`uv`](https://github.com/astral-sh/uv) for dependency management. Create the virtual environment and install dependencies:
 
-## Experimental Results & Ablation Studies
+```bash
+uv venv .venv --python 3.11
+source .venv/bin/activate
+uv sync
+```
 
-### Ablation Study of DINOv2 pipeline on Market-1501
+---
 
-| Configuration | Rank-1 | mAP |
-| :--- | :---: | :---: |
-| osnet_ain_x1_0 | 93.4% | 82.2% |
-| osnet_x1_0 | 94.3% | 83.6% |
-| DINOv2 (pretrained on LVD-142M) | 2.0% | 0.8% |
-| + BatchHard Triplet (LoRA 8) | 93.3% | 86.5% |
-| + BatchHard Triplet (LoRA 16) | 94.2% | 87.6% |
-| + BatchHard Triplet (LoRA 32) | 93.9% | 86.8% |
-| + BatchHard Triplet (Full Training) | 95.1% | 88.9% |
-| + BNNeck | 94.9% | 89.2% |
-| + Random Erasing | 95.0% | 90.3% |
-| + CE Loss | 95.7% | 90.4% |
-| + ArcFace | 95.9% | 91.7% |
-| + SupCon | 96.2% | 92.3% |
-| + CLS + Patch Average | 96.5% | 92.8% |
-| + Resolution ($384 \times 192$) | **96.6%** | 93.1% |
-| + Re-ranking | 96.5% | **94.2%** |
+<a name="dataset-preprocessing"></a>
 
+## Dataset Preparation & Preprocessing
 
-### Ablation Study of DINOv2 on MTMC Tracking 2025 Dataset
+### 1. Download & Directory Layout
+Download `train/` and `val/` splits from Hugging Face: [nvidia/PhysicalAI-SmartSpaces (MTMC_Tracking_2025)](https://huggingface.co/datasets/nvidia/PhysicalAI-SmartSpaces/tree/main/MTMC_Tracking_2025/).
 
-The performance metrics is compared across both **Image Level** and **Tracklet Level** configurations.
+```
+MTMC_Tracking_2025/
+├── train/<scene>/      # videos/ (.mp4), ground_truth.json, calibration.json
+└── val/<scene>/        # videos/ (.mp4), ground_truth.json, calibration.json
+```
 
-| Configuration | Image Level Rank-1 | Image Level mAP | Tracklet Level Rank-1 | Tracklet Level mAP |
-| :--- | :---: | :---: | :---: | :---: |
-| DINOv2 (pretrained on LVD-142M) | 32.0% | 6.3% | 35.9% | 10.2% |
-| + BatchHard Triplet (LoRA 8) | 88.1% | 70.9% | 95.4% | 81.2% |
-| + BatchHard Triplet (LoRA 16) | 88.7% | 70.8% | 95.4% | 80.7% |
-| + BatchHard Triplet (LoRA 32) | 79.1% | 46.2% | 82.0% | 56.2% |
-| + BatchHard Triplet (Full Training) | 90.4% | 75.0% | 93.9% | 82.2% |
-| + BNNeck | 89.7% | 75.7% | 95.4% | 80.7% |
-| + Random Erasing | 89.7% | 76.0% | 93.9% | 81.1% |
-| + CE Loss | 92.2% | 79.8% | 93.9% | 85.8% |
-| + ArcFace | 92.4% | 81.3% | 97.0% | 87.5% |
-| + SupCon | 92.2% | 81.5% | 97.0% | 87.7% |
-| + CLS + Patch Average | 91.7% | 81.6% | 97.0% | 87.5% |
-| + Resolution ($384 \times 192$) | 93.1% | 82.5% | 97.0% | 88.2% |
-| + 300 epochs | **93.7%** | **84.5%** | **97.0%** | **90.0%** |
+### 2. Run Preprocessing
+Extract crops and generate train/query/gallery splits (DukeMTMC-style one-query protocol):
 
-### Clustering & Pooling Methods on Tracklet-Level Results
+```bash
+python -m reid.data.preprocess_aicc \
+    --dataset-root /path/to/MTMC_Tracking_2025 \
+    --output-root /path/to/aicity_preprocessed \
+    --ann-stride 30 \
+    --max-gap 30 \
+    --min-len 2 \
+    --num-samples 30 \
+    --max-workers 16
+```
 
-| Method | Rank-1 | mAP |
-| :--- | :---: | :---: |
-| DBSCAN | 97.0% | 90.0% |
-| HDBSCAN | 96.2% | 88.6% |
-| Mean Pooling | 97.0% | 89.6% |
-| Medoid | 96.2% | 89.0% |
-| Weighted | 97.0% | 90.4% |
-| GeM Pooling | 95.4% | 91.2% |
-| + Re-ranking | **97.0%** | **91.6%** |
+### 3. Configure Manifest Paths
+Update the dataset paths in your YAML configuration (e.g. `configs/dinov2_aicc.yaml`):
 
-### Backbones Final Comparison (Full Setting) on MTMC Tracking 2025 Dataset
-This table provides a head-to-head architectural comparison between the OSNet baseline (osnet_ain_x1_0) and our proposed DINOv2 pipeline under the full experimental setting on the tracklet-level.
+```yaml
+data:
+  train: /path/to/aicity_preprocessed/manifests/image_train.csv
+  query: /path/to/aicity_preprocessed/manifests/image_query.csv
+  gallery: /path/to/aicity_preprocessed/manifests/image_gallery.csv
+```
 
+---
 
+<a name="training-inference"></a>
 
-| Backbone | Rank-1 | mAP |
-| :--- | :---: | :---: |
-| osnet_x1_0 (pretrained on Market-1501) | 88.0% | 50.7% |
-| osnet_x1_0 (Full trained + DBSCAN) | **95.4%** | 76.8% |
-| osnet_x1_0 (GeM Pooling) | 93.9% | 79.5% |
-| osnet_x1_0 (+ Re-ranking) | 93.1% | **80.5%** |
-| | | |
-| osnet_ain_x1_0 (pretrained on M, MS, C) | 94.0% | 54.3% |
-| osnet_ain_x1_0 (Full trained + DBSCAN) | 95.4% | 79.0% |
-| osnet_ain_x1_0 (GeM Pooling) | **96.2%** | 81.4% |
-| osnet_ain_x1_0 (+ Re-ranking) | 93.1% | **82.3%** |
-| | | |
-| DINOv2 (pretrained on LVD-142M) | 35.9% | 10.2% |
-| DINOv2 (Full trained + DBSCAN) | 97.0% | 90.0% |
-| DINOv2 (GeM Pooling) | 95.4% | 91.2% |
-| DINOv2 (+ Re-ranking) | **97.0%** | **91.6%** |
+## Pipeline Execution
 
+All training and inference workflows are controlled via YAML configurations. For a complete reference of parameters, loss functions, optimization settings, tracklet pooling, and evaluation options, see the [Configuration Reference](configs/README.md).
 
-> **Note on Full Experimental Setting:** The backbones integrate the complete optimized training pipeline, which includes: Full Training, BNNeck, Random Erasing, CE Loss, BatchHard Triplet Loss, SupCon Loss, ArcFace Loss, CLS + Patch Average, High-resolution (384x192), and training extended to 300 epochs.
+### 1. Training
+Train DINOv2 with hybrid token representation (`cls_patchavg`), 1D BNNeck, and multi-task metric learning losses:
+```bash
+python reid/train.py --config configs/dinov2_aicc.yaml
+```
+> **Output:** Best model weights and loss logs are saved to `checkpoints/best_model.pth` and `training_log.csv`.
 
-## Key Findings
-- **Feature Extraction**: Transitioning to **DINOv2** (with high-resolution inputs and BNNeck) and applying advanced metric learning (Triplet, ArcFace, SupCon losses) drastically improves visual representation, driving AI City mAP from a baseline of 54.3% to **91.6%**.
-- **Improved Feature Selection**: **GeM Pooling** outperforms standard DBSCAN clustering by successfully suppressing background noise and isolating high-activation, discriminative features.
-- **Robust Occlusion Handling**: Integrating Random Erasing forces the model to learn from diverse object parts, maintaining reliable feature extraction even when targets are partially hidden.
-- **Near State-of-the-Art Performance**: The fully optimized pipeline achieves **94.2% mAP** on Market-1501 and hits **97.0% Rank-1** on the AI City dataset.
+### 2. Inference & Tracklet Matching
+Run cross-camera retrieval with Generalized Mean (GeM) tracklet pooling and $k$-reciprocal re-ranking:
+```bash
+python reid/inference.py --config configs/dinov2_aicc_infer_tracklet.yaml
+```
+> **Output:** Evaluation metrics, distance matrices, and top-10 retrieval rankings are saved to `matching_results.csv` and `distance_matrix.pt`.
+
+---
+
+<a name="checkpoints"></a>
+
+## Model Checkpoints
+
+Fine-tuned model checkpoints are available on Google Drive:
+
+| Model | Target Benchmark | Input Size | mAP | Download Link |
+|---|---|:---:|:---:|:---:|
+| **DINOv2 (ViT-B/14)** | AI City / MTMC Tracking 2025 | $384 \times 192$ | **91.6%** | [Google Drive Checkpoint](https://drive.google.com/file/d/1yPUAox9N0lwK_fKZixIOJKrG_BDpl1-o/view?usp=sharing) |
+| **DINOv2 (ViT-B/14)** | Market-1501 | $384 \times 192$ | **94.2%** | [Google Drive Checkpoint](https://drive.google.com/file/d/10FuX0NnQeM1IAVL6FnNFAxQuuRfrcLDt/view?usp=sharing) |
+
+> Place downloaded checkpoint files into `checkpoints/` (e.g. `checkpoints/best_model.pth`).
+
+> **Note:** 94.2% mAP for Market-1501 is achieved with re-ranking, and 91.6% mAP for AI City 2025 is achieved at tracklet-level using GeM pooling and re-ranking.
+---
+
+<a name="benchmark-results"></a>
+
+## Key Results
+
+### 1. Tracklet-Level Evaluation (AI City / MTMC Tracking 2025)
+
+| Backbone / Model | Aggregation / Method | Rank-1 (%) | mAP (%) |
+|---|---|:---:|:---:|
+| **OSNet-AIN Baseline** (Hashempoor et al.) | Pretrained + DBSCAN ($\varepsilon=0.2$) | 93.9% | 54.3% |
+| **OSNet-AIN** | Full Fine-Tuned + GeM + Re-ranking | 93.1% | 82.3% |
+| **DINOv2 (ViT-B/14)** | **Full Fine-Tuned + GeM + Re-ranking** | **97.0%** | **91.6%** |
+
+### 2. Image-Level Evaluation (AI City & Market-1501)
+
+| Benchmark | Backbone / Model | Rank-1 (%) | mAP (%) |
+|---|---|:---:|:---:|
+| **AI City 2025** | **DINOv2 (ViT-B/14)** | **93.7%** | **84.5%** |
+| **Market-1501** | **DINOv2 (ViT-B/14)** | **96.6%** | **93.1%** |
+
+---
+
