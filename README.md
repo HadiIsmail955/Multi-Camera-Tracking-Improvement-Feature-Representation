@@ -181,3 +181,13 @@ Fine-tuned model checkpoints are available on Google Drive:
 
 ---
 
+<a name="report"></a>
+
+## Report & Documentation
+
+- 📄 *Project Report*: [report.pdf](report.pdf)
+- ⚙️ *Configuration Reference*: [configs/README.md](configs/README.md)
+
+---
+
+> **Note:** Our individual contributions can be viewed in the branches reid/rosefrancis and HadiIsmail
